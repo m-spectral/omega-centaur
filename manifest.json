@@ -1,0 +1,11 @@
+{
+  "id": "omega-centaur",
+  "name": "Omega Centaur",
+  "version": "1.0.0",
+  "minAppVersion": "1.13.7",
+  "description": "Build a cluster of ideas on a rotating sphere. Drag notes, follow links, and search to find pages.",
+  "author": "b. munoz",
+  "authorUrl": "https://github.com/m-spectral",
+  "fundingUrl": "https://buymeacoffee.com/morphystrategyco",
+  "isDesktopOnly": true
+}

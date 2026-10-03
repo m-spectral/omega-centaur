@@ -1,0 +1,122 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+   Copyright (c) 2026 ( B Munoz) */
+/* This class lands on .view-content itself (ItemView contentEl),
+   which Obsidian already sizes as a flex child. Do not position it absolutely —
+   that rips it out of the leaf and it spills over neighbouring panes. */
+.omega-centaur-root { position: relative; overflow: hidden; min-height: 0;
+  flex: 1 1 auto; height: 100%;      /* works whether the parent is flex or block */
+  background: var(--background-primary); }
+
+.omega-centaur-root .mg-canvas { position: absolute; inset: 0; display: block; touch-action: none; }
+
+.omega-centaur-root .mg-header { position: absolute; top: 18px; left: 22px; z-index: 3; pointer-events: none; }
+.omega-centaur-root .mg-title { font-size: 26px; font-weight: 600; letter-spacing: -.01em; color: var(--text-normal); line-height: 1.1; }
+.omega-centaur-root .mg-count { font-size: 13px; color: var(--text-faint); margin-top: 2px; }
+.omega-centaur-root .mg-tagline { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+.omega-centaur-root .mg-legend {
+  position: absolute; top: 20px; right: 24px; z-index: 3;
+  display: flex; flex-direction: column; gap: 2px;
+  width: 210px; max-width: calc(100% - 48px);
+  max-height: calc(100% - 40px); overflow-y: auto; padding: 4px;
+  background: var(--background-primary);
+}
+.omega-centaur-root .mg-legend::-webkit-scrollbar { width: 6px; }
+.omega-centaur-root .mg-legend::-webkit-scrollbar-thumb { background: var(--background-modifier-border); border-radius: 3px; }
+
+.omega-centaur-root .mg-legend-row {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; min-width: 0;
+  padding: 3px 6px; border: 0; border-radius: 5px;
+  background: transparent; box-shadow: none; text-align: left;
+  font-family: inherit; line-height: inherit; cursor: pointer;
+  font-size: 13px; color: var(--text-muted); white-space: nowrap;
+}
+.omega-centaur-root .mg-legend-row:hover { background: var(--background-modifier-hover); }
+.omega-centaur-root .mg-legend-row.mg-selected { background: var(--background-modifier-hover); }
+.omega-centaur-root .mg-legend-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+
+/* hierarchy */
+.omega-centaur-root .mg-legend-row.mg-main {
+  font-size: 14px; font-weight: 600; color: var(--text-normal); margin-top: 11px;
+}
+.omega-centaur-root .mg-legend-row.mg-main:first-child { margin-top: 0; }
+.omega-centaur-root .mg-d1 { padding-left: 20px; }
+.omega-centaur-root .mg-d2 { padding-left: 36px; font-size: 12.5px; color: var(--text-faint); }
+.omega-centaur-root .mg-d3 { padding-left: 52px; font-size: 12px;   color: var(--text-faint); }
+
+.omega-centaur-root .mg-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.omega-centaur-root .mg-main .mg-dot { width: 12px; height: 12px; }
+.omega-centaur-root .mg-legend-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.omega-centaur-root .mg-legend-n { margin-left: auto; padding-left: 10px; color: var(--text-faint);
+  flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+
+/* ---------------- floating search bar ---------------- */
+.omega-centaur-root .mg-search {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  width: min(520px, calc(100% - 44px));
+  min-width: 0;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+}
+.omega-centaur-root .mg-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 3px 0;
+  height: auto;
+  font-size: 13.5px;
+  color: var(--text-normal);
+}
+.omega-centaur-root .mg-search-input::placeholder { color: var(--text-faint); }
+.omega-centaur-root .mg-search-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.omega-centaur-root .mg-search-hits {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.omega-centaur-root .mg-search-clear {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  padding: 0; border: 0; background: transparent;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.omega-centaur-root .mg-search-clear:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.omega-centaur-root.mg-searching .mg-search-clear { display: flex; }
+.omega-centaur-root.mg-searching .mg-search {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.30),
+              0 0 0 1px var(--interactive-accent),
+              0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* cursor state is a class, not a style assignment from JS */
+.omega-centaur-root .mg-canvas.mg-grabbable { cursor: grab; }
+.omega-centaur-root .mg-canvas.mg-grabbable:active { cursor: grabbing; }
