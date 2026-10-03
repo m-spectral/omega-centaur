@@ -33,8 +33,21 @@ Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugin
 ## Your vault data stays local
 
 Omega Centaur reads Markdown files in the current vault to build the map. It does not access files outside the vault or send data to a server.
+## Sample Images
 
-## The source is GPL-3.0-only
+### Hover over a group in the right-hand list to isolate it
+
+<img width="1131" height="919" alt="Omega Centaur 1" src="https://github.com/user-attachments/assets/3416f6af-0f20-40ce-b8de-073379ad0277" />
+
+### Drag empty space to rotate the globe through 360 degrees. Scroll to zoom.
+<img width="1125" height="912" alt="Omega Centaur 2" src="https://github.com/user-attachments/assets/80dcaf52-bba7-4ef4-9f47-efc542c88848" />
+
+### Search note titles beneath the globe.
+
+<img width="1131" height="915" alt="Omega Centaur 3" src="https://github.com/user-attachments/assets/b2a3c969-639b-4bca-b661-3978846f3edb" />
+
+
+## License
 
 Read the [license](LICENSE) before reusing or distributing the source.
 
