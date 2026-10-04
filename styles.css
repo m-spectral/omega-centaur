@@ -13,6 +13,18 @@
 .omega-centaur-root .mg-title { font-size: 26px; font-weight: 600; letter-spacing: -.01em; color: var(--text-normal); line-height: 1.1; }
 .omega-centaur-root .mg-count { font-size: 13px; color: var(--text-faint); margin-top: 2px; }
 .omega-centaur-root .mg-tagline { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.omega-centaur-root .mg-organize,
+.omega-centaur-root .mg-capture {
+  position: absolute; top: 100px; left: 22px; z-index: 4;
+  border: 1px solid var(--background-modifier-border); border-radius: 8px;
+  background: var(--background-secondary); color: var(--text-normal);
+  padding: 7px 11px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.omega-centaur-root .mg-capture { top: 139px; }
+.omega-centaur-root .mg-organize:hover,
+.omega-centaur-root .mg-capture:hover { background: var(--background-modifier-hover); }
+.omega-centaur-root .mg-organize:focus-visible,
+.omega-centaur-root .mg-capture:focus-visible { outline: 2px solid var(--interactive-accent); }
 
 .omega-centaur-root .mg-legend {
   position: absolute; top: 20px; right: 24px; z-index: 3;
@@ -115,7 +127,58 @@
               0 0 0 1px var(--interactive-accent),
               0 1px 0 rgba(255, 255, 255, 0.06) inset;
 }
+.omega-centaur-root .mg-search-results {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: calc(100% + 8px);
+  max-height: min(48vh, 380px); overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-secondary);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+}
+.omega-centaur-root.mg-searching .mg-search-results { display: block; }
+.omega-centaur-root .mg-search-result { display: flex; align-items: stretch; gap: 3px; border-radius: 8px; }
+.omega-centaur-root .mg-search-result.mg-active,
+.omega-centaur-root .mg-search-result:hover { background: var(--background-modifier-hover); }
+.omega-centaur-root .mg-search-locate,
+.omega-centaur-root .mg-search-open {
+  border: 0; box-shadow: none; background: transparent; color: var(--text-normal);
+  font-family: inherit; cursor: pointer; border-radius: 7px;
+}
+.omega-centaur-root .mg-search-locate {
+  display: flex; flex: 1; flex-direction: column; align-items: flex-start;
+  min-width: 0; gap: 1px; padding: 8px 10px; text-align: left;
+}
+.omega-centaur-root .mg-search-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 13px; font-weight: 600; }
+.omega-centaur-root .mg-search-group { max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 11px; color: var(--text-muted); }
+.omega-centaur-root .mg-search-open { align-self: center; padding: 7px 10px;
+  font-size: 11.5px; color: var(--interactive-accent); }
+.omega-centaur-root .mg-search-locate:focus-visible,
+.omega-centaur-root .mg-search-open:focus-visible { outline: 2px solid var(--interactive-accent); }
+.omega-centaur-root .mg-search-empty,
+.omega-centaur-root .mg-search-more { padding: 9px 10px; color: var(--text-muted); font-size: 12px; }
+.omega-centaur-root .mg-search-more { border-top: 1px solid var(--background-modifier-border); }
 
 /* cursor state is a class, not a style assignment from JS */
 .omega-centaur-root .mg-canvas.mg-grabbable { cursor: grab; }
 .omega-centaur-root .mg-canvas.mg-grabbable:active { cursor: grabbing; }
+
+.omega-organize-modal .mg-proposal { border: 1px solid var(--background-modifier-border);
+  border-radius: 10px; padding: 14px; margin: 12px 0; }
+.omega-organize-modal .mg-proposal-title { font-size: 15px; font-weight: 600; }
+.omega-organize-modal .mg-proposal-reason { color: var(--text-muted); font-size: 12px; margin: 7px 0 10px; }
+.omega-organize-modal .mg-proposal-fields { display: grid; grid-template-columns: auto 1fr;
+  gap: 5px 12px; font-size: 12px; }
+.omega-organize-modal .mg-proposal-fields .mg-field-name { color: var(--text-muted); }
+.omega-organize-modal .mg-proposal-actions { display: flex; gap: 8px; margin-top: 12px; }
+.omega-organize-modal .mg-proposal-actions button { cursor: pointer; }
+.omega-organize-modal .mg-organize-help { color: var(--text-muted); line-height: 1.5; }
+
+.omega-capture-modal textarea { width: 100%; min-height: 150px; resize: vertical;
+  padding: 12px; line-height: 1.5; }
+.omega-capture-modal .mg-capture-hint { color: var(--text-muted); font-size: 12px; }
+.omega-capture-modal button { cursor: pointer; }

@@ -1,7 +1,7 @@
 'use strict';
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 ( B Munoz)
-const { Plugin, ItemView, PluginSettingTab, Setting } = require('obsidian');
+const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Notice, TFile } = require('obsidian');
 
 const VIEW_TYPE    = 'omega-centaur';
 
@@ -38,6 +38,9 @@ function fuzzyScore(needle, hay) {
     prevEnd = found + 1;
     at = found + 1;
   }
+  // A scattered subsequence looks like a match on long titles even when the
+  // user is searching for one word. Allow typos, but keep the match local.
+  if (prevEnd - first > n.length + Math.max(4, Math.ceil(n.length * 0.75))) return -1;
   score += Math.max(0, 10 - first);
   score -= Math.max(0, h.length - n.length) * 0.04;
   return score;
@@ -93,10 +96,23 @@ async function buildModel(app, s) {
     }
     return null;
   };
+  const declaredMoc = f => {
+    let raw = fmOf(f).moc;
+    if (Array.isArray(raw)) raw = raw[0];
+    if (!raw) return null;
+    const target = resolve(String(raw).replace(/^\[\[|\]\]$/g, ''), f.path);
+    return target && isMoc(target) ? target : null;
+  };
 
   /* parent comes from the note's own breadcrumb, never from its first link
      (Index's first link is a child, which would make a cycle) */
   const mocs = files.filter(isMoc);
+  let grouping = s.groupBy;
+  if (grouping === 'moc' && mocs.length === 0) {
+    const types = new Set(files.map(f => fmOf(f).type).filter(Boolean));
+    const folders = new Set(files.map(f => f.parent?.path).filter(p => p && p !== '/'));
+    grouping = types.size > 1 ? 'type' : folders.size > 1 ? 'folder' : 'all';
+  }
   const parent = new Map();
   for (const m of mocs) {
     let par = null;
@@ -123,18 +139,23 @@ async function buildModel(app, s) {
 
   const nodes = files.map(f => {
     let g;
-    if (s.groupBy === 'moc') {
-      g = isMoc(f) ? f.basename : (firstLinkedMoc(f) || {}).basename;
+    if (grouping === 'moc') {
+      g = isMoc(f) ? f.basename : (declaredMoc(f) || firstLinkedMoc(f) || {}).basename;
       if (!g) g = claimedBy.get(f.path);
       if (!g) g = 'Unfiled';
-    } else if (s.groupBy === 'folder') {
+    } else if (grouping === 'folder') {
       g = (f.parent && f.parent.path !== '/') ? f.parent.name : 'vault root';
+    } else if (grouping === 'all') {
+      g = 'All notes';
     } else {
-      let v = fmOf(f)[s.groupBy];
+      let v = fmOf(f)[grouping];
       if (Array.isArray(v)) v = v[0];
       g = (v == null || v === '') ? 'uncategorised' : String(v);
     }
-    return { file: f, name: f.basename, group: g, deg: 0, v: [0,0,0], pinned: false };
+    const aliases = fmOf(f).aliases;
+    return { file: f, name: f.basename, group: g,
+      aliases: Array.isArray(aliases) ? aliases.map(String) : aliases ? [String(aliases)] : [],
+      deg: 0, v: [0,0,0], pinned: false, fixed: false };
   });
 
   const links = [], adj = new Map(), seen = new Set();
@@ -159,7 +180,7 @@ async function buildModel(app, s) {
   for (const nd of nodes) counts.set(nd.group, (counts.get(nd.group) || 0) + 1);
 
   let ordered = [];
-  if (s.groupBy === 'moc') {
+  if (grouping === 'moc') {
     const kids = new Map();
     for (const m of mocs) {
       const par = parent.get(m.basename);
@@ -215,7 +236,7 @@ async function buildModel(app, s) {
   color.set('Unfiled', 'hsl(0,0%,52%)');
   for (const nd of nodes) nd.color = color.get(nd.group) || 'hsl(0,0%,52%)';
 
-  return { nodes, links, adj, ordered, counts, color };
+  return { nodes, links, adj, ordered, counts, color, grouping };
 }
 
 /* ================= the view ================= */
@@ -247,6 +268,16 @@ class GlobeView extends ItemView {
     hd.createDiv({ cls: 'mg-title', text: 'Omega Centaur' });
     this.countEl = hd.createDiv({ cls: 'mg-count' });
     hd.createDiv({ cls: 'mg-tagline', text: 'Build your cluster of ideas.' });
+    const organize = root.createEl('button', {
+      cls: 'mg-organize', type: 'button', text: 'Organize notes'
+    });
+    organize.setAttribute('aria-label', 'Review note organization suggestions');
+    organize.onclick = () => this.plugin.openOrganizer();
+    const capture = root.createEl('button', {
+      cls: 'mg-capture', type: 'button', text: 'Capture idea'
+    });
+    capture.setAttribute('aria-label', 'Capture an idea as a new note');
+    capture.onclick = () => this.plugin.openCapture();
 
     this.legendEl = root.createDiv({ cls: 'mg-legend' });
     this.canvas   = root.createEl('canvas', { cls: 'mg-canvas' });
@@ -264,12 +295,15 @@ class GlobeView extends ItemView {
     this.hitEl.setAttribute('aria-live', 'polite');
     this.clearEl  = sb.createEl('button', { cls: 'mg-search-clear', type: 'button', text: '\u00d7' });
     this.clearEl.setAttribute('aria-label', 'Clear search');
+    this.resultEl = sb.createDiv({ cls: 'mg-search-results' });
+    this.resultEl.setAttribute('aria-label', 'Matching notes');
     this.bindSearch();
 
     this.loadMark();
     await this.build();
     if (this.closed) return;
     this.bind();
+    this.searchEl.focus({ preventScroll: true });
 
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(root);
@@ -330,22 +364,40 @@ class GlobeView extends ItemView {
     if (this.ro) this.ro.disconnect();
     if (this.runSearch) this.runSearch.cancel();
     if (this.scheduleBuild) this.scheduleBuild.cancel();
+    await this.plugin.persist();
   }
 
   /* ---------- search ---------- */
   bindSearch() {
     this.hits = null;                  // null = not searching; Set = matching indices
     this.cam  = null;                  // active camera tween target
+    this.searchMatches = [];
+    this.searchActive = 0;
+    this.searchSelection = false;
 
-    this.runSearch = debounce(q => this.applySearch(q), 250);
+    this.runSearch = debounce(q => this.applySearch(q), 120);
 
     this.registerDomEvent(this.searchEl, 'input', () => {
       this.runSearch(this.searchEl.value);
     });
     this.registerDomEvent(this.searchEl, 'keydown', e => {
       if (e.key === 'Escape') { e.preventDefault(); this.clearSearch(); this.searchEl.blur(); }
-      if (e.key === 'Enter')  { e.preventDefault(); this.runSearch.cancel();
-                                this.applySearch(this.searchEl.value); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.runSearch.cancel();
+        if (!this.searchMatches.length) this.applySearch(this.searchEl.value, false);
+        if (this.searchMatches.length) {
+          const delta = e.key === 'ArrowDown' ? 1 : -1;
+          this.focusSearchHit((this.searchActive + delta + this.searchMatches.length)
+            % this.searchMatches.length);
+        }
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.runSearch.cancel();
+        if (!this.searchMatches.length) this.applySearch(this.searchEl.value, false);
+        this.openSearchHit(this.searchActive);
+      }
     });
     this.registerDomEvent(this.clearEl, 'click', () => { this.clearSearch(); this.searchEl.focus(); });
   }
@@ -355,8 +407,55 @@ class GlobeView extends ItemView {
     this.searchEl.value = '';
     this.hits = null;
     this.cam  = null;
+    this.searchMatches = [];
+    this.searchActive = 0;
+    if (this.searchSelection) this.selectedNode = null;
+    this.searchSelection = false;
     if (this.hitEl) { this.hitEl.setText(''); }
+    if (this.resultEl) this.resultEl.empty();
     this.contentEl.removeClass('mg-searching');
+  }
+
+  focusSearchHit(index, moveCam = true) {
+    const match = this.searchMatches[index];
+    if (!match || !this.nodes[match.i]) return;
+    this.searchActive = index;
+    this.selectedNode = match.i;
+    this.searchSelection = true;
+    if (moveCam) this.faceTo(this.nodes[match.i].p, 1.45);
+    this.renderSearchResults();
+  }
+
+  openSearchHit(index) {
+    const match = this.searchMatches[index];
+    if (match && this.nodes[match.i])
+      void this.app.workspace.getLeaf(false).openFile(this.nodes[match.i].file);
+  }
+
+  renderSearchResults() {
+    this.resultEl.empty();
+    if (!this.searchMatches.length) {
+      this.resultEl.createDiv({ cls: 'mg-search-empty', text: 'No matching notes' });
+      return;
+    }
+    const start = Math.max(0, Math.min(this.searchActive - 7, this.searchMatches.length - 8));
+    const visible = this.searchMatches.slice(start, start + 8);
+    for (let k = 0; k < visible.length; k++) {
+      const nd = this.nodes[visible[k].i];
+      const row = this.resultEl.createDiv({ cls: 'mg-search-result' });
+      row.toggleClass('mg-active', start + k === this.searchActive);
+      const locate = row.createEl('button', { cls: 'mg-search-locate', type: 'button' });
+      locate.setAttribute('aria-label', 'Show ' + nd.name + ' on globe');
+      locate.createSpan({ cls: 'mg-search-name', text: nd.name });
+      locate.createSpan({ cls: 'mg-search-group', text: nd.group });
+      locate.onclick = () => { this.focusSearchHit(start + k); this.searchEl.focus(); };
+      const open = row.createEl('button', { cls: 'mg-search-open', type: 'button', text: 'Open' });
+      open.setAttribute('aria-label', 'Open ' + nd.name);
+      open.onclick = () => this.openSearchHit(start + k);
+    }
+    if (this.searchMatches.length > visible.length)
+      this.resultEl.createDiv({ cls: 'mg-search-more',
+        text: 'Use arrow keys for all ' + this.searchMatches.length + ' matches' });
   }
 
   applySearch(raw, moveCam) {
@@ -366,31 +465,30 @@ class GlobeView extends ItemView {
 
     const scored = [];
     for (let i = 0; i < this.nodes.length; i++) {
-      const sc = fuzzyScore(q, this.nodes[i].name);
+      const nd = this.nodes[i];
+      let sc = fuzzyScore(q, nd.name);
+      for (const alias of nd.aliases) sc = Math.max(sc, fuzzyScore(q, alias) * 0.9);
+      sc = Math.max(sc, fuzzyScore(q, nd.group) * 0.55);
       if (sc >= 0) scored.push({ i, sc });
     }
-    scored.sort((a, b) => b.sc - a.sc);
+    scored.sort((a, b) => b.sc - a.sc ||
+      this.nodes[a.i].name.localeCompare(this.nodes[b.i].name));
 
     this.hits = new Set(scored.map(o => o.i));
+    this.searchMatches = scored;
+    this.searchActive = 0;
     this.contentEl.addClass('mg-searching');
     if (this.hitEl)
       this.hitEl.setText(scored.length ? scored.length + (scored.length === 1 ? ' match' : ' matches')
                                        : 'no matches');
-    if (!scored.length) { this.hits = new Set(); this.cam = null; return; }
-
-    /* Aim at the centroid of the matches on the sphere. If they are spread
-       right around the globe the centroid collapses toward the origin and has
-       no direction, so fall back to the single best match. */
-    let cx = 0, cy = 0, cz = 0;
-    const top = scored.slice(0, 12);
-    for (const o of top) {
-      const w = o.sc, p = this.nodes[o.i].p;
-      cx += p[0]*w; cy += p[1]*w; cz += p[2]*w;
+    if (!scored.length) {
+      this.cam = null;
+      if (this.searchSelection) this.selectedNode = null;
+      this.searchSelection = false;
+      this.renderSearchResults();
+      return;
     }
-    let len = Math.hypot(cx, cy, cz);
-    if (len < 1e-3) { const p = this.nodes[scored[0].i].p; cx = p[0]; cy = p[1]; cz = p[2]; len = 1; }
-    if (moveCam !== false)
-      this.faceTo([cx/len, cy/len, cz/len], scored.length === 1 ? 1.45 : 1.15);
+    this.focusSearchHit(0, moveCam !== false);
   }
 
   /* pointOfView equivalent: rotate so model-space unit vector p faces the camera.
@@ -430,7 +528,7 @@ class GlobeView extends ItemView {
       row.toggleClass('mg-selected', group === name);
       row.setAttribute('aria-pressed', String(group === name));
     }
-    const moc = this.plugin.settings.groupBy === 'moc'
+    const moc = this.model.grouping === 'moc'
       ? members.find(n => n.name === name) : null;
     if (moc) {
       this.selectedNode = this.nodes.indexOf(moc);
@@ -490,7 +588,7 @@ class GlobeView extends ItemView {
         if (this.downAt &&
             Math.abs(e.clientX - this.downAt.x) + Math.abs(e.clientY - this.downAt.y) > 4)
           this.dragMoved = true;
-        const p = this.unproject(e);
+        const p = this.dragMoved ? this.unproject(e) : null;
         if (p) {
           const n = this.nodes[this.dragNode];
           n.p = p; n.v = [0,0,0];
@@ -514,6 +612,10 @@ class GlobeView extends ItemView {
         const i = this.dragNode;
         this.nodes[i].pinned = false;
         this.alpha = Math.max(this.alpha, 0.4);
+        if (this.dragMoved) {
+          this.nodes[i].fixed = true;
+          this.plugin.savePosition(this.nodes[i].file.path, this.nodes[i].p);
+        }
         if (!this.dragMoved && e && e.type === 'pointerup') {
           if (this.clearFocusOnClick) this.clearGroupFocus();
           else this.app.workspace.getLeaf(false).openFile(this.nodes[i].file);
@@ -540,6 +642,8 @@ class GlobeView extends ItemView {
         const q = this.rot(n.p);
         n.p = norm(this.unrot(norm([q[0] + dx * 0.08, q[1] - dy * 0.08, q[2]])));
         n.v = [0, 0, 0];
+        n.fixed = true;
+        this.plugin.savePosition(n.file.path, n.p);
         this.alpha = Math.max(this.alpha, 0.5);
       } else {
         this.yaw += dx * 0.08;
@@ -580,7 +684,7 @@ class GlobeView extends ItemView {
 
     for (let i = 0; i < n; i++) {
       const nd = this.nodes[i];
-      if (nd.pinned) { nd.v = [0,0,0]; continue; }
+      if (nd.pinned || nd.fixed) { nd.v = [0,0,0]; continue; }
       const v = nd.v || (nd.v = [0,0,0]);
       for (let k = 0; k < 3; k++) v[k] = (v[k] + f[i][k] * a) * 0.72;
       // keep motion tangent to the sphere, then snap back onto it
@@ -595,13 +699,21 @@ class GlobeView extends ItemView {
     const version = ++this.buildVersion;
     const m = await buildModel(this.app, this.plugin.settings);
     if (this.closed || version !== this.buildVersion) return;
-    const previous = new Map(this.nodes.filter(n => n.p).map(n => [n.file.path, n.p]));
+    const previous = new Map(this.nodes.filter(n => n.p)
+      .map(n => [n.file.path, { p: n.p.slice(), fixed: n.fixed }]));
     const selectedPath = this.selectedNode == null ? null : this.nodes[this.selectedNode]?.file.path;
     this.model = m;
     this.nodes = m.nodes; this.links = m.links; this.adj = m.adj;
     for (const nd of this.nodes) { nd.v = [0,0,0]; nd.pinned = false; }
     this.seedLayout(m.ordered);
-    for (const nd of this.nodes) if (previous.has(nd.file.path)) nd.p = previous.get(nd.file.path).slice();
+    for (const nd of this.nodes) {
+      const saved = this.plugin.positions[nd.file.path];
+      if (Array.isArray(saved) && saved.length === 3 && saved.every(Number.isFinite)) {
+        nd.p = norm(saved); nd.fixed = true;
+      }
+      const old = previous.get(nd.file.path);
+      if (old) { nd.p = old.p; nd.fixed = old.fixed; }
+    }
     this.selectedNode = selectedPath == null ? null
       : this.nodes.findIndex(n => n.file.path === selectedPath);
     if (this.selectedNode < 0) this.selectedNode = null;
@@ -885,13 +997,118 @@ class GlobeView extends ItemView {
   }
 }
 
+/* ================= AI proposal review ================= */
+const ORGANIZE_FIELDS = ['type', 'umbrella', 'area', 'status', 'moc'];
+
+class CaptureModal extends Modal {
+  constructor(app, plugin) { super(app); this.plugin = plugin; }
+
+  onOpen() {
+    this.titleEl.setText('Capture an idea');
+    const c = this.contentEl;
+    c.addClass('omega-capture-modal');
+    c.createEl('p', { text: 'Write the thought now. Give it a place later.' });
+    const input = c.createEl('textarea');
+    input.placeholder = 'What are you thinking about?';
+    input.setAttribute('aria-label', 'Idea to save as a note');
+    const hint = c.createEl('p', { cls: 'mg-capture-hint', text: 'Saved locally in Omega Inbox. No categories needed.' });
+    const save = c.createEl('button', { text: 'Save note' });
+    save.disabled = true;
+    input.addEventListener('input', () => { save.disabled = !input.value.trim(); });
+    input.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save.click(); }
+    });
+    save.onclick = async () => {
+      save.disabled = true;
+      try {
+        const file = await this.plugin.captureIdea(input.value);
+        this.close();
+        new Notice('Idea saved to Omega Inbox.');
+        await this.app.workspace.getLeaf(false).openFile(file);
+      } catch (e) {
+        hint.setText('Could not save: ' + e.message);
+        save.disabled = false;
+      }
+    };
+    input.focus();
+  }
+}
+
+class OrganizeModal extends Modal {
+  constructor(app, plugin) { super(app); this.plugin = plugin; }
+
+  async onOpen() {
+    this.titleEl.setText('Organize notes');
+    this.contentEl.addClass('omega-organize-modal');
+    await this.render();
+  }
+
+  async render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl('p', { cls: 'mg-organize-help',
+      text: 'Review AI suggestions before Omega changes a note. Your notes stay where they are until you choose Apply.' });
+    if (this.plugin.lastOrganization) {
+      const undo = c.createEl('button', { text: 'Undo last organization change' });
+      undo.onclick = async () => {
+        try { await this.plugin.undoOrganization(); new Notice('Organization change undone.'); await this.render(); }
+        catch (e) { new Notice('Could not undo: ' + e.message); }
+      };
+    }
+    let proposals;
+    try { proposals = await this.plugin.readProposals(); }
+    catch (e) { c.createEl('p', { text: 'Could not read suggestions: ' + e.message }); return; }
+    if (!proposals.length) {
+      c.createEl('p', { text: 'No suggestions are ready. Ask Codex to use the omega-organize skill on this vault, then reopen this panel.' });
+      return;
+    }
+    c.createEl('p', { text: proposals.length +
+      (proposals.length === 1 ? ' suggestion ready' : ' suggestions ready') });
+    for (const p of proposals.slice(0, 20)) {
+      const file = this.app.vault.getAbstractFileByPath(p.note);
+      const card = c.createDiv({ cls: 'mg-proposal' });
+      card.createDiv({ cls: 'mg-proposal-title', text: file instanceof TFile ? file.basename : p.note });
+      if (p.reason) card.createDiv({ cls: 'mg-proposal-reason', text: p.reason });
+      const fields = card.createDiv({ cls: 'mg-proposal-fields' });
+      const current = file instanceof TFile
+        ? (this.app.metadataCache.getFileCache(file)?.frontmatter || {}) : {};
+      for (const key of ORGANIZE_FIELDS) {
+        if (!p.fields || !Object.prototype.hasOwnProperty.call(p.fields, key)) continue;
+        fields.createDiv({ cls: 'mg-field-name', text: key });
+        const before = current[key] === undefined ? 'Unset' : String(current[key]);
+        fields.createDiv({ text: before + ' → ' + String(p.fields[key]) });
+      }
+      const actions = card.createDiv({ cls: 'mg-proposal-actions' });
+      const stale = !(file instanceof TFile) || !Number.isFinite(p.mtime) ||
+        Math.abs(file.stat.mtime - p.mtime) > 2000;
+      if (stale) {
+        actions.createSpan({ text: 'This note changed. Ask AI to refresh the suggestion.' });
+      } else {
+        const apply = actions.createEl('button', { text: 'Apply' });
+        apply.onclick = async () => {
+          apply.disabled = true;
+          try { await this.plugin.applyProposal(p); new Notice('Note organized.'); await this.render(); }
+          catch (e) { apply.disabled = false; new Notice('Could not apply: ' + e.message); }
+        };
+      }
+      const open = actions.createEl('button', { text: 'Open note' });
+      open.disabled = !(file instanceof TFile);
+      open.onclick = () => { void this.app.workspace.getLeaf(false).openFile(file); };
+      const skip = actions.createEl('button', { text: 'Skip' });
+      skip.onclick = async () => {
+        await this.plugin.removeProposal(p.note); await this.render();
+      };
+    }
+  }
+}
+
 /* ================= settings ================= */
 class GlobeSettings extends PluginSettingTab {
   constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
   display() {
     const c = this.containerEl; c.empty();
     const save = async rebuild => {
-      await this.plugin.saveData(this.plugin.settings);
+      await this.plugin.persist();
       this.plugin.refresh(rebuild);
     };
     new Setting(c).setName('Group by')
@@ -938,11 +1155,135 @@ class GlobeSettings extends PluginSettingTab {
 
 module.exports = class OmegaCentaur extends Plugin {
   async onload() {
-    this.settings = Object.assign({}, DEFAULTS, await this.loadData());
+    const data = await this.loadData() || {};
+    this.settings = Object.assign({}, DEFAULTS, data.settings || data);
+    this.positions = data.positions && typeof data.positions === 'object' ? data.positions : {};
+    this.writeQueue = Promise.resolve();
+    this.schedulePersist = debounce(() => { void this.persist(); }, 350);
     this.registerView(VIEW_TYPE, leaf => new GlobeView(leaf, this));
     this.addRibbonIcon('globe', 'Open Omega Centaur', () => this.activate());
     this.addCommand({ id: 'open', name: 'Open globe view', callback: () => this.activate() });
+    this.addCommand({ id: 'search', name: 'Search the globe', callback: async () => {
+      const leaf = await this.activate();
+      leaf.view.searchEl?.focus({ preventScroll: true });
+    } });
+    this.addCommand({ id: 'organize', name: 'Review organization suggestions',
+      callback: () => this.openOrganizer() });
+    this.addCommand({ id: 'capture', name: 'Capture an idea',
+      callback: () => this.openCapture() });
+    this.addCommand({ id: 'refresh', name: 'Refresh globe',
+      callback: () => this.refresh(true) });
     this.addSettingTab(new GlobeSettings(this.app, this));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      if (file.extension !== 'md' || !this.positions[oldPath]) return;
+      this.positions[file.path] = this.positions[oldPath];
+      delete this.positions[oldPath];
+      this.schedulePersist();
+    }));
+    this.registerEvent(this.app.vault.on('delete', file => {
+      if (!this.positions[file.path]) return;
+      delete this.positions[file.path];
+      this.schedulePersist();
+    }));
+  }
+
+  savePosition(path, point) {
+    this.positions[path] = norm(point);
+    this.schedulePersist();
+  }
+
+  persist() {
+    const data = { settings: { ...this.settings }, positions: { ...this.positions } };
+    this.writeQueue = this.writeQueue.catch(() => {}).then(() => this.saveData(data));
+    return this.writeQueue;
+  }
+
+  proposalPath() {
+    return this.app.vault.configDir + '/plugins/' + this.manifest.id + '/organize-proposals.json';
+  }
+
+  async readProposals() {
+    const path = this.proposalPath();
+    if (!(await this.app.vault.adapter.exists(path))) return [];
+    const data = JSON.parse(await this.app.vault.adapter.read(path));
+    if (data.schemaVersion !== 1 || !Array.isArray(data.proposals))
+      throw new Error('Unsupported suggestion file.');
+    return data.proposals.slice(0, 200).filter(p => p && typeof p.note === 'string' &&
+      p.fields && typeof p.fields === 'object');
+  }
+
+  async removeProposal(note) {
+    const proposals = (await this.readProposals()).filter(p => p.note !== note);
+    await this.app.vault.adapter.write(this.proposalPath(),
+      JSON.stringify({ schemaVersion: 1, proposals }, null, 2) + '\n');
+  }
+
+  openOrganizer() { new OrganizeModal(this.app, this).open(); }
+
+  openCapture() { new CaptureModal(this.app, this).open(); }
+
+  async captureIdea(raw) {
+    const idea = raw.trim();
+    if (!idea) throw new Error('Write a thought first.');
+    const first = idea.split(/\r?\n/).find(line => line.trim()) || 'Untitled idea';
+    const title = first.replace(/^\s*#{1,6}\s*/, '').replace(/[\\/:*?"<>|#[\]^]/g, ' ')
+      .replace(/\s+/g, ' ').trim().slice(0, 64).trim() || 'Untitled idea';
+    const folder = 'Omega Inbox';
+    const existing = this.app.vault.getAbstractFileByPath(folder);
+    if (existing && existing instanceof TFile) throw new Error('A note named Omega Inbox blocks the inbox folder.');
+    if (!existing) await this.app.vault.createFolder(folder);
+    let path = folder + '/' + title + '.md';
+    for (let n = 2; this.app.vault.getAbstractFileByPath(path); n++)
+      path = folder + '/' + title + ' ' + n + '.md';
+    return this.app.vault.create(path, idea + '\n');
+  }
+
+  async applyProposal(p) {
+    const file = this.app.vault.getAbstractFileByPath(p.note);
+    if (!(file instanceof TFile) || file.extension !== 'md') throw new Error('Note is missing.');
+    if (!Number.isFinite(p.mtime) || Math.abs(file.stat.mtime - p.mtime) > 2000)
+      throw new Error('Note changed since this suggestion was made.');
+    const changes = {};
+    for (const key of ORGANIZE_FIELDS) {
+      if (!Object.prototype.hasOwnProperty.call(p.fields, key)) continue;
+      const value = p.fields[key];
+      if (typeof value !== 'string' || !value.trim() || value.length > 120 || /[\r\n]/.test(value))
+        throw new Error('Invalid ' + key + ' value.');
+      if (key === 'moc') {
+        const moc = this.app.vault.getAbstractFileByPath(value);
+        if (!(moc instanceof TFile) || moc.extension !== 'md')
+          throw new Error('Suggested MOC is missing.');
+        changes.moc = '[[' + moc.path.replace(/\.md$/i, '') + ']]';
+      } else changes[key] = value.trim();
+    }
+    if (!Object.keys(changes).length) throw new Error('Suggestion has no supported fields.');
+    const previous = {};
+    await this.app.fileManager.processFrontMatter(file, fm => {
+      for (const [key, value] of Object.entries(changes)) {
+        previous[key] = Object.prototype.hasOwnProperty.call(fm, key)
+          ? { exists: true, value: fm[key] } : { exists: false };
+        fm[key] = value;
+      }
+    });
+    this.lastOrganization = { path: file.path, previous };
+    try { await this.removeProposal(p.note); }
+    catch (e) { new Notice('Note updated. Suggestion cleanup needs attention.'); }
+    this.refresh(true);
+  }
+
+  async undoOrganization() {
+    const change = this.lastOrganization;
+    if (!change) return;
+    const file = this.app.vault.getAbstractFileByPath(change.path);
+    if (!(file instanceof TFile)) throw new Error('Note is missing.');
+    await this.app.fileManager.processFrontMatter(file, fm => {
+      for (const [key, prior] of Object.entries(change.previous)) {
+        if (prior.exists) fm[key] = prior.value;
+        else delete fm[key];
+      }
+    });
+    this.lastOrganization = null;
+    this.refresh(true);
   }
 
   // No onunload teardown: Obsidian detaches a plugin's own views on unload, and
@@ -960,5 +1301,6 @@ module.exports = class OmegaCentaur extends Plugin {
     let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
     if (!leaf) { leaf = workspace.getLeaf('tab'); await leaf.setViewState({ type: VIEW_TYPE, active: true }); }
     workspace.revealLeaf(leaf);
+    return leaf;
   }
 };
