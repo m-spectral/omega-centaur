@@ -733,8 +733,7 @@ class GlobeView extends ItemView {
     for (const ring of rings) for (let k = 0; k < ring.length-1; k++) {
       const a = this.proj(ring[k], g), b = this.proj(ring[k+1], g);
       const zm = (a.z+b.z)/2;
-      ctx.strokeStyle = mutedColor;
-      ctx.globalAlpha = 0.04 + 0.09*(zm+1)/2;
+      ctx.strokeStyle = 'rgba(150,160,175,' + (0.04 + 0.09*(zm+1)/2).toFixed(3) + ')';
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -760,8 +759,9 @@ class GlobeView extends ItemView {
             if (zm > -0.85) {
               const base = 0.06 + 0.22*(zm+1)/2;
               const al = lit ? Math.min(1, base*3.4) : (dim ? base*0.25 : base);
-              ctx.strokeStyle = lit ? textColor : mutedColor;
-              ctx.globalAlpha = al;
+              ctx.strokeStyle = lit
+                ? 'rgba(235,240,250,' + al.toFixed(3) + ')'
+                : 'rgba(150,170,190,' + al.toFixed(3) + ')';
               ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(cur.x,cur.y); ctx.stroke();
             }
           }
@@ -804,7 +804,7 @@ class GlobeView extends ItemView {
         ctx.beginPath(); ctx.arc(q.x, q.y, rad*1.3, 0, Math.PI*2); ctx.fill();
         ctx.restore();
         ctx.globalAlpha = 0.55 + 0.45*depth;
-        ctx.lineWidth = 1.5; ctx.strokeStyle = textColor;
+        ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffffff';
         ctx.beginPath(); ctx.arc(q.x, q.y, rad*2.3, 0, Math.PI*2); ctx.stroke();
         ctx.globalAlpha = al;
         ctx.fillStyle = n.color;

@@ -2,6 +2,8 @@
 
 Omega Centaur turns your vault into a rotating map. Each Markdown note sits on a sphere, and links follow arcs across its surface. Rotate the globe, move notes, search by title, and select a group to find its place.
 
+Version 1.1 brings back Morphy Globe's blue-gray map lines and compact, transparent legend. The legend still lets you navigate to a group, and in-view map refreshes retain the positions of existing notes.
+
 ## The name reflects a cluster of ideas
 
 Globular clusters are tightly bound collections of stars held together by their own gravity. That gravity gives them a nearly spherical shape. [Omega Centauri](https://www.esa.int/ESA_Multimedia/Images/2019/07/A_puzzle_of_10_million_stars), one of the largest examples visible from Earth, contains roughly 10 million stars. In this map, your notes form the cluster and their links show how the ideas connect.
