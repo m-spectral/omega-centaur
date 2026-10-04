@@ -26,6 +26,8 @@ The map updates when you add, rename, or delete a Markdown note. Obsidian may ne
 
 Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/omega-centaur/`. Enable Omega Centaur under Community plugins, then open it from the ribbon or command palette. The plugin has not yet been published to the Community directory.
 
+If you have a personal logo, place a transparent `mark.png` in the same plugin folder. Omega Centaur displays it behind the globe. The logo is optional and is not included in the shared source.
+
 ## Position persistence, scale, and mobile support remain limited
 
 - Manual node positions survive a map refresh but reset when the view closes or the plugin restarts.

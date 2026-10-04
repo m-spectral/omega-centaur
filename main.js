@@ -231,6 +231,7 @@ class GlobeView extends ItemView {
     this.alpha = 1; this.last = 0;
     this.buildVersion = 0;
     this.closed = false;
+    this.mark = null;
   }
   getViewType()    { return VIEW_TYPE; }
   getDisplayText() { return 'Omega Centaur'; }
@@ -265,6 +266,7 @@ class GlobeView extends ItemView {
     this.clearEl.setAttribute('aria-label', 'Clear search');
     this.bindSearch();
 
+    this.loadMark();
     await this.build();
     if (this.closed) return;
     this.bind();
@@ -286,6 +288,27 @@ class GlobeView extends ItemView {
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
+  }
+
+  /* An optional, vault-local mark keeps a personal logo off the shared release. */
+  loadMark() {
+    const path = this.app.vault.configDir + '/plugins/omega-centaur/mark.png';
+    const img = new Image();
+    img.onload = () => {
+      if (this.closed) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.fillStyle = 'hsl(42, 64%, 56%)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      this.mark = canvas;
+    };
+    img.onerror = () => { this.mark = null; };
+    try { img.src = this.app.vault.adapter.getResourcePath(path); }
+    catch (e) { this.mark = null; }
   }
 
   watchChanges() {
@@ -714,6 +737,14 @@ class GlobeView extends ItemView {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, g.w, g.h);
     ctx.globalAlpha = 1;
+
+    if (this.mark) {
+      const width = Math.min(g.w, g.h) * 0.38;
+      const height = width * this.mark.height / this.mark.width;
+      ctx.globalAlpha = 0.34;
+      ctx.drawImage(this.mark, g.cx - width/2, g.cy - height/2, width, height);
+      ctx.globalAlpha = 1;
+    }
 
     /* grid */
     ctx.lineWidth = 0.7;
