@@ -61,6 +61,12 @@ const DEFAULTS = {
   excludeFolders: '',
 };
 
+function isMocFile(app, file) {
+  if (!(file instanceof TFile) || file.extension !== 'md') return false;
+  const type = app.metadataCache.getFileCache(file)?.frontmatter?.type;
+  return type === 'moc' || file.basename === 'Index' || /\bMOC$/.test(file.basename);
+}
+
 /* ================= math ================= */
 const norm = v => { const l = Math.hypot(v[0],v[1],v[2]) || 1; return [v[0]/l, v[1]/l, v[2]/l]; };
 const dot  = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
@@ -83,10 +89,7 @@ async function buildModel(app, s) {
 
   const cacheOf = f => app.metadataCache.getFileCache(f) || {};
   const fmOf    = f => cacheOf(f).frontmatter || {};
-  const isMoc   = f => {
-    const t = fmOf(f).type;
-    return t === 'moc' || f.basename === 'Index' || /\bMOC$/.test(f.basename);
-  };
+  const isMoc   = f => isMocFile(app, f);
   const resolve = (link, from) => app.metadataCache.getFirstLinkpathDest(
     (link || '').split('#')[0].split('|')[0], from);
   const firstLinkedMoc = f => {
@@ -268,16 +271,23 @@ class GlobeView extends ItemView {
     hd.createDiv({ cls: 'mg-title', text: 'Omega Centaur' });
     this.countEl = hd.createDiv({ cls: 'mg-count' });
     hd.createDiv({ cls: 'mg-tagline', text: 'Build your cluster of ideas.' });
-    const organize = root.createEl('button', {
-      cls: 'mg-organize', type: 'button', text: 'Organize notes'
-    });
-    organize.setAttribute('aria-label', 'Review note organization suggestions');
-    organize.onclick = () => this.plugin.openOrganizer();
     const capture = root.createEl('button', {
       cls: 'mg-capture', type: 'button', text: 'Capture idea'
     });
     capture.setAttribute('aria-label', 'Capture an idea as a new note');
     capture.onclick = () => this.plugin.openCapture();
+    this.inboxButton = root.createEl('button', {
+      cls: 'mg-inbox-toggle', type: 'button', text: 'Inbox'
+    });
+    this.inboxButton.setAttribute('aria-label', 'Show unplaced captured notes');
+    this.inboxButton.setAttribute('aria-expanded', 'false');
+    this.inboxButton.onclick = () => {
+      this.inboxOpen = !this.inboxOpen;
+      this.renderInbox();
+    };
+    this.inboxPanel = root.createDiv({ cls: 'mg-inbox-panel' });
+    this.inboxOpen = false;
+    this.draggingInboxPath = null;
 
     this.legendEl = root.createDiv({ cls: 'mg-legend' });
     this.canvas   = root.createEl('canvas', { cls: 'mg-canvas' });
@@ -367,6 +377,58 @@ class GlobeView extends ItemView {
     await this.plugin.persist();
   }
 
+  renderInbox() {
+    if (!this.inboxPanel) return;
+    const notes = this.plugin.unplacedInboxNotes();
+    this.inboxButton.setText('Inbox ' + notes.length);
+    this.inboxButton.setAttribute('aria-expanded', String(this.inboxOpen));
+    this.inboxPanel.toggleClass('mg-open', this.inboxOpen);
+    this.inboxPanel.empty();
+    if (!this.inboxOpen) return;
+    this.inboxPanel.createDiv({ cls: 'mg-inbox-title', text: 'Place your ideas' });
+    this.inboxPanel.createDiv({ cls: 'mg-inbox-help',
+      text: this.model?.grouping === 'moc'
+        ? 'Drag a note onto a MOC on the right, or choose Attach.'
+        : 'Choose Attach to pick a MOC. Switch grouping to MOCs to drag onto the legend.' });
+    if (this.plugin.lastPlacement) {
+      const undo = this.inboxPanel.createEl('button', {
+        cls: 'mg-inbox-undo', type: 'button', text: 'Undo last attachment'
+      });
+      undo.onclick = async () => {
+        try { await this.plugin.undoPlacement(); this.renderInbox(); new Notice('Attachment undone.'); }
+        catch (e) { new Notice('Could not undo: ' + e.message); }
+      };
+    }
+    if (!notes.length) {
+      this.inboxPanel.createDiv({ cls: 'mg-inbox-empty', text: 'Inbox clear. Capture an idea to start.' });
+      return;
+    }
+    for (const file of notes) {
+      const card = this.inboxPanel.createDiv({ cls: 'mg-inbox-card' });
+      card.draggable = true;
+      card.setAttribute('aria-label', 'Unplaced note: ' + file.basename);
+      card.createDiv({ cls: 'mg-inbox-name', text: file.basename });
+      const actions = card.createDiv({ cls: 'mg-inbox-actions' });
+      const attach = actions.createEl('button', { type: 'button', text: 'Attach' });
+      attach.setAttribute('aria-label', 'Attach ' + file.basename + ' to a MOC');
+      attach.onclick = () => this.plugin.openPlacement(file);
+      const open = actions.createEl('button', { type: 'button', text: 'Open' });
+      open.setAttribute('aria-label', 'Open ' + file.basename);
+      open.onclick = () => { void this.app.workspace.getLeaf(false).openFile(file); };
+      card.ondragstart = e => {
+        this.draggingInboxPath = file.path;
+        e.dataTransfer?.setData('application/x-omega-note', file.path);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'link';
+        this.contentEl.addClass('mg-placing');
+      };
+      card.ondragend = () => {
+        this.draggingInboxPath = null;
+        this.contentEl.removeClass('mg-placing');
+        for (const row of this.legendRows.values()) row.removeClass('mg-drop-hover');
+      };
+    }
+  }
+
   /* ---------- search ---------- */
   bindSearch() {
     this.hits = null;                  // null = not searching; Set = matching indices
@@ -452,6 +514,9 @@ class GlobeView extends ItemView {
       const open = row.createEl('button', { cls: 'mg-search-open', type: 'button', text: 'Open' });
       open.setAttribute('aria-label', 'Open ' + nd.name);
       open.onclick = () => this.openSearchHit(start + k);
+      const place = row.createEl('button', { cls: 'mg-search-place', type: 'button', text: 'Place' });
+      place.setAttribute('aria-label', 'Place ' + nd.name + ' in a MOC');
+      place.onclick = () => this.plugin.openPlacement(nd.file);
     }
     if (this.searchMatches.length > visible.length)
       this.resultEl.createDiv({ cls: 'mg-search-more',
@@ -743,8 +808,32 @@ class GlobeView extends ItemView {
           e.preventDefault(); this.clearGroupFocus();
         }
       };
+      const moc = m.grouping === 'moc' ? this.plugin.mocWithName(o.name) : null;
+      if (moc) {
+        row.addClass('mg-drop-target');
+        row.ondragover = e => {
+          if (!this.draggingInboxPath) return;
+          e.preventDefault(); e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'link';
+          row.addClass('mg-drop-hover');
+        };
+        row.ondragleave = () => row.removeClass('mg-drop-hover');
+        row.ondrop = e => {
+          if (!this.draggingInboxPath) return;
+          e.preventDefault(); e.stopPropagation();
+          const notePath = this.draggingInboxPath;
+          this.draggingInboxPath = null;
+          row.removeClass('mg-drop-hover');
+          this.contentEl.removeClass('mg-placing');
+          void this.plugin.attachNoteToMoc(notePath, moc.path)
+            .then(() => { this.renderInbox(); this.focusGroup(o.name); new Notice('Note attached to ' + moc.basename + '.'); })
+            .catch(error => new Notice('Could not attach note: ' + error.message));
+        };
+      }
       this.legendRows.set(o.name, row);
     }
+
+    this.renderInbox();
 
     /* node indices just changed, so any live hit set is stale */
     if (this.searchEl) {
@@ -1011,7 +1100,7 @@ class CaptureModal extends Modal {
     const input = c.createEl('textarea');
     input.placeholder = 'What are you thinking about?';
     input.setAttribute('aria-label', 'Idea to save as a note');
-    const hint = c.createEl('p', { cls: 'mg-capture-hint', text: 'Saved locally in Omega Inbox. No categories needed.' });
+    const hint = c.createEl('p', { cls: 'mg-capture-hint', text: 'This will save locally in Omega Inbox. Place it on the globe afterward.' });
     const save = c.createEl('button', { text: 'Save note' });
     save.disabled = true;
     input.addEventListener('input', () => { save.disabled = !input.value.trim(); });
@@ -1021,16 +1110,73 @@ class CaptureModal extends Modal {
     save.onclick = async () => {
       save.disabled = true;
       try {
-        const file = await this.plugin.captureIdea(input.value);
-        this.close();
-        new Notice('Idea saved to Omega Inbox.');
-        await this.app.workspace.getLeaf(false).openFile(file);
+        await this.plugin.captureIdea(input.value);
       } catch (e) {
         hint.setText('Could not save: ' + e.message);
         save.disabled = false;
+        return;
       }
+      this.close();
+      new Notice('Idea saved to Omega Inbox.');
+      try { await this.plugin.showCaptured(); }
+      catch (e) { new Notice('Note saved. Could not show Inbox: ' + e.message); }
     };
     input.focus();
+  }
+}
+
+class PlacementModal extends Modal {
+  constructor(app, plugin, file) { super(app); this.plugin = plugin; this.file = file; }
+
+  onOpen() {
+    this.titleEl.setText('Place ' + this.file.basename);
+    const c = this.contentEl;
+    c.addClass('omega-placement-modal');
+    c.createEl('p', { text: this.plugin.settings.groupBy === 'moc'
+      ? 'Choose a map of content. Omega will link this note to it and move its globe group.'
+      : 'Choose a map of content. Omega will link this note to it; choose MOC grouping to see that location on the globe.' });
+    const search = c.createEl('input', { type: 'search' });
+    search.placeholder = 'Search locations…';
+    search.setAttribute('aria-label', 'Search maps of content');
+    const list = c.createDiv({ cls: 'mg-placement-list' });
+    const render = () => {
+      list.empty();
+      const q = search.value.trim();
+      const mocs = this.plugin.getMocs()
+        .map(file => ({ file, score: q ? Math.max(fuzzyScore(q, file.basename), fuzzyScore(q, file.path)) : 0 }))
+        .filter(item => item.score >= 0)
+        .sort((a, b) => b.score - a.score || a.file.basename.localeCompare(b.file.basename));
+      if (!mocs.length) {
+        list.createDiv({ cls: 'mg-placement-empty',
+          text: q ? 'No matching MOC.' : 'No MOC notes found. Create a note ending in MOC to make a location.' });
+        return;
+      }
+      for (const { file } of mocs.slice(0, 40)) {
+        const row = list.createEl('button', { cls: 'mg-placement-row', type: 'button' });
+        row.setAttribute('aria-label', 'Attach to ' + file.basename);
+        row.createSpan({ text: file.basename });
+        if (file.parent?.path !== '/') row.createSpan({ cls: 'mg-placement-path', text: file.parent.path });
+        row.onclick = async () => {
+          row.disabled = true;
+          try {
+            await this.plugin.attachNoteToMoc(this.file.path, file.path);
+          } catch (e) { row.disabled = false; new Notice('Could not attach: ' + e.message); return; }
+          this.close();
+          new Notice('Note attached to ' + file.basename + '.');
+          try {
+            const leaf = await this.plugin.activate();
+            if (leaf.view instanceof GlobeView) {
+              leaf.view.inboxOpen = true;
+              await leaf.view.build();
+              leaf.view.focusGroup(file.basename);
+            }
+          } catch (e) { new Notice('Note attached. Could not show its location: ' + e.message); }
+        };
+      }
+    };
+    search.addEventListener('input', render);
+    render();
+    search.focus();
   }
 }
 
@@ -1158,6 +1304,7 @@ module.exports = class OmegaCentaur extends Plugin {
     const data = await this.loadData() || {};
     this.settings = Object.assign({}, DEFAULTS, data.settings || data);
     this.positions = data.positions && typeof data.positions === 'object' ? data.positions : {};
+    this.justPlaced = new Map();
     this.writeQueue = Promise.resolve();
     this.schedulePersist = debounce(() => { void this.persist(); }, 350);
     this.registerView(VIEW_TYPE, leaf => new GlobeView(leaf, this));
@@ -1169,6 +1316,7 @@ module.exports = class OmegaCentaur extends Plugin {
     } });
     this.addCommand({ id: 'organize', name: 'Review organization suggestions',
       callback: () => this.openOrganizer() });
+    this.addCommand({ id: 'inbox', name: 'Show captured notes', callback: () => this.showInbox() });
     this.addCommand({ id: 'capture', name: 'Capture an idea',
       callback: () => this.openCapture() });
     this.addCommand({ id: 'refresh', name: 'Refresh globe',
@@ -1221,6 +1369,92 @@ module.exports = class OmegaCentaur extends Plugin {
   openOrganizer() { new OrganizeModal(this.app, this).open(); }
 
   openCapture() { new CaptureModal(this.app, this).open(); }
+
+  getMocs() {
+    return this.app.vault.getMarkdownFiles().filter(file => isMocFile(this.app, file));
+  }
+
+  mocWithName(name) {
+    const matches = this.getMocs().filter(file => file.basename === name);
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  unplacedInboxNotes() {
+    return this.app.vault.getMarkdownFiles()
+      .filter(file => {
+        if (!file.path.startsWith('Omega Inbox/')) return false;
+        const placedAt = this.justPlaced.get(file.path);
+        if (!placedAt) return true;
+        if (Date.now() - placedAt < 3000) return false;
+        this.justPlaced.delete(file.path);
+        return true;
+      })
+      .filter(file => {
+        const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.moc;
+        const value = Array.isArray(raw) ? raw[0] : raw;
+        if (!value) return true;
+        const link = String(value).replace(/^\[\[|\]\]$/g, '');
+        const target = this.app.metadataCache.getFirstLinkpathDest(link, file.path);
+        return !isMocFile(this.app, target);
+      })
+      .sort((a, b) => b.stat.mtime - a.stat.mtime || a.basename.localeCompare(b.basename));
+  }
+
+  openPlacement(file) {
+    if (!(file instanceof TFile) || file.extension !== 'md') return;
+    new PlacementModal(this.app, this, file).open();
+  }
+
+  async attachNoteToMoc(notePath, mocPath) {
+    const note = this.app.vault.getAbstractFileByPath(notePath);
+    const moc = this.app.vault.getAbstractFileByPath(mocPath);
+    if (!(note instanceof TFile) || note.extension !== 'md') throw new Error('Note is missing.');
+    if (!isMocFile(this.app, moc) || note.path === moc.path) throw new Error('Choose an existing MOC.');
+    const placedValue = '[[' + moc.path.replace(/\.md$/i, '') + ']]';
+    let previous;
+    await this.app.fileManager.processFrontMatter(note, fm => {
+      previous = Object.prototype.hasOwnProperty.call(fm, 'moc')
+        ? { exists: true, value: fm.moc } : { exists: false };
+      fm.moc = placedValue;
+    });
+    this.lastPlacement = { path: note.path, previous, placedValue };
+    this.justPlaced.set(note.path, Date.now());
+    this.refresh(true);
+    return moc;
+  }
+
+  async undoPlacement() {
+    const change = this.lastPlacement;
+    if (!change) return;
+    const note = this.app.vault.getAbstractFileByPath(change.path);
+    if (!(note instanceof TFile)) throw new Error('Note is missing.');
+    await this.app.fileManager.processFrontMatter(note, fm => {
+      if (fm.moc !== change.placedValue) throw new Error('This note was placed again.');
+      if (change.previous.exists) fm.moc = change.previous.value;
+      else delete fm.moc;
+    });
+    this.justPlaced.delete(note.path);
+    this.lastPlacement = null;
+    this.refresh(true);
+  }
+
+  async showInbox() {
+    const leaf = await this.activate();
+    if (leaf.view instanceof GlobeView) {
+      leaf.view.inboxOpen = true;
+      leaf.view.renderInbox();
+      leaf.view.inboxButton.focus({ preventScroll: true });
+    }
+  }
+
+  async showCaptured() {
+    const leaf = await this.activate();
+    if (leaf.view instanceof GlobeView) {
+      leaf.view.inboxOpen = true;
+      await leaf.view.build();
+      leaf.view.inboxButton.focus({ preventScroll: true });
+    }
+  }
 
   async captureIdea(raw) {
     const idea = raw.trim();
