@@ -46,7 +46,7 @@ The manifest sets `minAppVersion` to `1.13.7`, the Obsidian desktop version used
 
 ## Position persistence, scale, and mobile support
 
-- Manual node positions now stay as map refreshes, closing the view, and restarting the plugin. Notes you have moved stay fixed while the remaining notes can settle around them.
+- Manual node positions stay put during map refreshes and after you close the view or restart the plugin. Notes you have moved stay fixed while the remaining notes can settle around them.
 - Physics compares every pair of notes, so very large vaults can be slow. Exclude folders in settings if needed.
 - Desktop is the principal support.
 - Mobile is not yet supported.
@@ -63,7 +63,21 @@ For the globe, Omega uses file names for titles and Obsidian's metadata cache fo
 
 The GitHub release tag must match the version in `manifest.json`. GitHub Actions checks the code, attests the exact `main.js`, `styles.css`, and `manifest.json` bytes, and uploads those files as release assets. After publication, download an asset and verify it with `gh attestation verify main.js -R m-spectral/omega-centaur` (repeat for `styles.css`). Attestations are generated when the release workflow runs.
 
-## The source is GPL-3.0-only
+## Sample Images from Version 1
+
+### Hover over a group in the right-hand list to isolate it
+
+<img width="1131" height="919" alt="Omega Centaur 1" src="https://github.com/user-attachments/assets/3416f6af-0f20-40ce-b8de-073379ad0277" />
+
+### Drag empty space to rotate the globe through 360 degrees. Scroll to zoom.
+
+<img width="1125" height="912" alt="Omega Centaur 2" src="https://github.com/user-attachments/assets/80dcaf52-bba7-4ef4-9f47-efc542c88848" />
+
+### Search note titles beneath the globe.
+
+<img width="1131" height="915" alt="Omega Centaur 3" src="https://github.com/user-attachments/assets/b2a3c969-639b-4bca-b661-3978846f3edb" />
+
+## License
 
 Read the [license](LICENSE) before reusing or distributing the source.
 
