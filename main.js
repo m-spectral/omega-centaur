@@ -279,7 +279,7 @@ class GlobeView extends ItemView {
     this.inboxButton = root.createEl('button', {
       cls: 'mg-inbox-toggle', type: 'button', text: 'Inbox'
     });
-    this.inboxButton.setAttribute('aria-label', 'Show captured notes');
+    this.inboxButton.setAttribute('aria-label', 'Show notes to organize');
     this.inboxButton.setAttribute('aria-expanded', 'false');
     this.inboxButton.onclick = () => {
       this.inboxOpen = !this.inboxOpen;
@@ -387,10 +387,19 @@ class GlobeView extends ItemView {
   renderInbox() {
     if (!this.inboxPanel) return;
     const entries = this.plugin.inboxNotes();
+    if (this.model?.grouping === 'moc') {
+      const listed = new Set(entries.map(entry => entry.file.path));
+      for (const node of this.model.nodes) {
+        if (node.group === 'Unfiled' && !listed.has(node.file.path))
+          entries.push({ file: node.file, moc: null });
+      }
+    }
+    entries.sort((a, b) => b.file.stat.mtime - a.file.stat.mtime ||
+      a.file.basename.localeCompare(b.file.basename));
     const pending = entries.filter(entry => !entry.moc);
     const placed = entries.filter(entry => entry.moc);
     this.inboxButton.setText(pending.length ? 'Inbox ' + pending.length : 'Inbox');
-    this.inboxButton.setAttribute('aria-label', 'Show captured notes, ' + pending.length + ' to place');
+    this.inboxButton.setAttribute('aria-label', 'Show notes to organize, ' + pending.length + ' to place');
     this.inboxButton.setAttribute('aria-expanded', String(this.inboxOpen));
     this.inboxPanel.toggleClass('mg-open', this.inboxOpen);
     this.inboxPanel.empty();
@@ -416,7 +425,7 @@ class GlobeView extends ItemView {
       };
     }
     if (!entries.length)
-      this.inboxPanel.createDiv({ cls: 'mg-inbox-empty', text: 'Capture an idea to start.' });
+      this.inboxPanel.createDiv({ cls: 'mg-inbox-empty', text: 'No notes waiting. Capture an idea to start.' });
     if (pending.length)
       this.inboxPanel.createDiv({ cls: 'mg-inbox-section', text: 'To place' });
     for (const entry of [...pending, ...placed]) {

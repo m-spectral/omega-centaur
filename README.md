@@ -12,7 +12,7 @@ Click a group in the right-hand legend to turn toward it. Click that group again
 
 Select **Capture idea** on the globe, write a thought, and select **Save note**. Omega makes a Markdown note in `Omega Inbox` using its first line as the title. You can also save with Command/Control and Enter. The globe stays open and shows the new note in its **Inbox** tray.
 
-The Inbox shows every note in `Omega Inbox`. Notes that still need a location appear under **To place**; notes already attached to a MOC appear under **Placed**, with their location shown. Select **Attach** or **Change**, search for a MOC, and select that location. You can also drag a note card onto a MOC in the globe's right-hand legend. The tray closes after placement; use its Close button, Escape, or a click outside it to dismiss it at any time.
+The Inbox shows notes in `Omega Inbox` and, in MOC grouping, any other vault note still shown as **Unfiled**. Notes that need a location appear under **To place**; captured notes already attached to a MOC appear under **Placed**, with their location shown. Select **Attach** or **Change**, search for a MOC, and select that location. You can also drag a note card onto a MOC in the globe's right-hand legend. The tray closes after placement; use its Close button, Escape, or a click outside it to dismiss it at any time. A placed note outside `Omega Inbox` leaves the Inbox queue and remains findable through search.
 
 Placement adds a `moc` link to the note and moves its globe group; it does not combine note contents or move the Markdown file. **Undo last attachment** reverses the most recent placement. Search results have **Place** for notes created outside Omega Inbox. This manual path works without AI or a skill.
 
