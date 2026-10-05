@@ -4,7 +4,7 @@ Omega Centaur turns your vault into a rotating map. Each Markdown note sits on a
 
 Version 2 builds on that map. Search now gives you a direct route to a note, and a new Inbox helps you give notes a place in your existing maps of content.
 
-## The name reflects a cluster of ideas
+## Origin of Ideas
 
 Globular clusters are tightly bound collections of stars held together by their own gravity. That gravity gives them a nearly spherical shape. [Omega Centauri](https://www.esa.int/ESA_Multimedia/Images/2019/07/A_puzzle_of_10_million_stars), one of the largest examples visible from Earth, contains roughly 10 million stars. In this map, your notes form the cluster and their links show how the ideas connect.
 
@@ -42,17 +42,22 @@ The map updates when you add, rename, or delete a Markdown note. Obsidian may ne
 
 Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/omega-centaur/`. Enable Omega Centaur under Community plugins, then open it from the ribbon or command palette. The same three files are the GitHub release assets.
 
+The manifest sets `minAppVersion` to `1.13.7`, the Obsidian desktop version used for the Version 2 live test. Older Obsidian versions have not been verified.
+
 ## Position persistence, scale, and mobile support
 
-- Manual node positions now survive a map refresh, closing the view, and restarting the plugin. Notes you have moved stay fixed while the remaining notes can settle around them.
+- Manual node positions now stay as map refreshes, closing the view, and restarting the plugin. Notes you have moved stay fixed while the remaining notes can settle around them.
 - Physics compares every pair of notes, so very large vaults can be slow. Exclude folders in settings if needed.
-- Desktop is the supported target. Mobile interaction has not been verified.
+- Desktop is the principal support.
+- Mobile is not yet supported.
 
 ## Your vault data stays local
 
-Omega Centaur lists the paths of all Markdown notes to build the full globe and search index. It uses file names for titles and Obsidian's metadata cache for aliases, properties, and links. It reads MOC note text to find the `↑ [[Parent]]` breadcrumb. It does not read the bodies of other notes to build the globe or send vault data to a server.
+Omega Centaur calls `app.vault.getMarkdownFiles()` to list every Markdown note path in the vault. It needs that full list to show every note on the globe, connect notes through their links, build groups and search results, and find MOCs and Inbox notes. It does not call `getFiles()` to list attachments or other file types.
 
-**Exclude folders** removes matching notes from the map and search results. Omega still sees their paths while applying the filter; this setting is for display and performance, not access control. Capturing an idea creates a note in `Omega Inbox`. Placing a note changes that note's `moc` property after you choose a MOC.
+For the globe, Omega uses file names for titles and Obsidian's metadata cache for aliases, properties, and links. It reads MOC note text to find the `↑ [[Parent]]` breadcrumb; it does not read the bodies of other notes to build the globe. This work stays on your device. The plugin makes no network requests or uploads of vault paths or note content.
+
+**Exclude folders** hides matching notes from the map and search results after Omega has listed the Markdown paths. It is a display and performance setting, not an access control. Capturing an idea creates a note in `Omega Inbox`. Placing a note changes that note's `moc` property after you choose a MOC.
 
 ## Release files can be verified
 
