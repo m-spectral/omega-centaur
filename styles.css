@@ -207,17 +207,6 @@
 .omega-centaur-root .mg-canvas.mg-grabbable { cursor: grab; }
 .omega-centaur-root .mg-canvas.mg-grabbable:active { cursor: grabbing; }
 
-.omega-organize-modal .mg-proposal { border: 1px solid var(--background-modifier-border);
-  border-radius: 10px; padding: 14px; margin: 12px 0; }
-.omega-organize-modal .mg-proposal-title { font-size: 15px; font-weight: 600; }
-.omega-organize-modal .mg-proposal-reason { color: var(--text-muted); font-size: 12px; margin: 7px 0 10px; }
-.omega-organize-modal .mg-proposal-fields { display: grid; grid-template-columns: auto 1fr;
-  gap: 5px 12px; font-size: 12px; }
-.omega-organize-modal .mg-proposal-fields .mg-field-name { color: var(--text-muted); }
-.omega-organize-modal .mg-proposal-actions { display: flex; gap: 8px; margin-top: 12px; }
-.omega-organize-modal .mg-proposal-actions button { cursor: pointer; }
-.omega-organize-modal .mg-organize-help { color: var(--text-muted); line-height: 1.5; }
-
 .omega-capture-modal textarea { width: 100%; min-height: 150px; resize: vertical;
   padding: 12px; line-height: 1.5; }
 .omega-capture-modal .mg-capture-hint { color: var(--text-muted); font-size: 12px; }

@@ -1122,8 +1122,7 @@ class GlobeView extends ItemView {
   }
 }
 
-/* ================= AI proposal review ================= */
-const ORGANIZE_FIELDS = ['type', 'umbrella', 'area', 'status', 'moc'];
+/* ================= note capture and placement ================= */
 
 class CaptureModal extends Modal {
   constructor(app, plugin) { super(app); this.plugin = plugin; }
@@ -1216,74 +1215,6 @@ class PlacementModal extends Modal {
   }
 }
 
-class OrganizeModal extends Modal {
-  constructor(app, plugin) { super(app); this.plugin = plugin; }
-
-  async onOpen() {
-    this.titleEl.setText('Organize notes');
-    this.contentEl.addClass('omega-organize-modal');
-    await this.render();
-  }
-
-  async render() {
-    const c = this.contentEl;
-    c.empty();
-    c.createEl('p', { cls: 'mg-organize-help',
-      text: 'Review AI suggestions before Omega changes a note. Your notes stay where they are until you choose Apply.' });
-    if (this.plugin.lastOrganization) {
-      const undo = c.createEl('button', { text: 'Undo last organization change' });
-      undo.onclick = async () => {
-        try { await this.plugin.undoOrganization(); new Notice('Organization change undone.'); await this.render(); }
-        catch (e) { new Notice('Could not undo: ' + e.message); }
-      };
-    }
-    let proposals;
-    try { proposals = await this.plugin.readProposals(); }
-    catch (e) { c.createEl('p', { text: 'Could not read suggestions: ' + e.message }); return; }
-    if (!proposals.length) {
-      c.createEl('p', { text: 'No suggestions are ready. Ask Codex to use the omega-organize skill on this vault, then reopen this panel.' });
-      return;
-    }
-    c.createEl('p', { text: proposals.length +
-      (proposals.length === 1 ? ' suggestion ready' : ' suggestions ready') });
-    for (const p of proposals.slice(0, 20)) {
-      const file = this.app.vault.getAbstractFileByPath(p.note);
-      const card = c.createDiv({ cls: 'mg-proposal' });
-      card.createDiv({ cls: 'mg-proposal-title', text: file instanceof TFile ? file.basename : p.note });
-      if (p.reason) card.createDiv({ cls: 'mg-proposal-reason', text: p.reason });
-      const fields = card.createDiv({ cls: 'mg-proposal-fields' });
-      const current = file instanceof TFile
-        ? (this.app.metadataCache.getFileCache(file)?.frontmatter || {}) : {};
-      for (const key of ORGANIZE_FIELDS) {
-        if (!p.fields || !Object.prototype.hasOwnProperty.call(p.fields, key)) continue;
-        fields.createDiv({ cls: 'mg-field-name', text: key });
-        const before = current[key] === undefined ? 'Unset' : String(current[key]);
-        fields.createDiv({ text: before + ' → ' + String(p.fields[key]) });
-      }
-      const actions = card.createDiv({ cls: 'mg-proposal-actions' });
-      const stale = !(file instanceof TFile) || !Number.isFinite(p.mtime) ||
-        Math.abs(file.stat.mtime - p.mtime) > 2000;
-      if (stale) {
-        actions.createSpan({ text: 'This note changed. Ask AI to refresh the suggestion.' });
-      } else {
-        const apply = actions.createEl('button', { text: 'Apply' });
-        apply.onclick = async () => {
-          apply.disabled = true;
-          try { await this.plugin.applyProposal(p); new Notice('Note organized.'); await this.render(); }
-          catch (e) { apply.disabled = false; new Notice('Could not apply: ' + e.message); }
-        };
-      }
-      const open = actions.createEl('button', { text: 'Open note' });
-      open.disabled = !(file instanceof TFile);
-      open.onclick = () => { void this.app.workspace.getLeaf(false).openFile(file); };
-      const skip = actions.createEl('button', { text: 'Skip' });
-      skip.onclick = async () => {
-        await this.plugin.removeProposal(p.note); await this.render();
-      };
-    }
-  }
-}
-
 /* ================= settings ================= */
 class GlobeSettings extends PluginSettingTab {
   constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
@@ -1350,8 +1281,6 @@ module.exports = class OmegaCentaur extends Plugin {
       const leaf = await this.activate();
       leaf.view.searchEl?.focus({ preventScroll: true });
     } });
-    this.addCommand({ id: 'organize', name: 'Review organization suggestions',
-      callback: () => this.openOrganizer() });
     this.addCommand({ id: 'inbox', name: 'Show captured notes', callback: () => this.showInbox() });
     this.addCommand({ id: 'capture', name: 'Capture an idea',
       callback: () => this.openCapture() });
@@ -1381,28 +1310,6 @@ module.exports = class OmegaCentaur extends Plugin {
     this.writeQueue = this.writeQueue.catch(() => {}).then(() => this.saveData(data));
     return this.writeQueue;
   }
-
-  proposalPath() {
-    return this.app.vault.configDir + '/plugins/' + this.manifest.id + '/organize-proposals.json';
-  }
-
-  async readProposals() {
-    const path = this.proposalPath();
-    if (!(await this.app.vault.adapter.exists(path))) return [];
-    const data = JSON.parse(await this.app.vault.adapter.read(path));
-    if (data.schemaVersion !== 1 || !Array.isArray(data.proposals))
-      throw new Error('Unsupported suggestion file.');
-    return data.proposals.slice(0, 200).filter(p => p && typeof p.note === 'string' &&
-      p.fields && typeof p.fields === 'object');
-  }
-
-  async removeProposal(note) {
-    const proposals = (await this.readProposals()).filter(p => p.note !== note);
-    await this.app.vault.adapter.write(this.proposalPath(),
-      JSON.stringify({ schemaVersion: 1, proposals }, null, 2) + '\n');
-  }
-
-  openOrganizer() { new OrganizeModal(this.app, this).open(); }
 
   openCapture() { new CaptureModal(this.app, this).open(); }
 
@@ -1507,54 +1414,6 @@ module.exports = class OmegaCentaur extends Plugin {
     for (let n = 2; this.app.vault.getAbstractFileByPath(path); n++)
       path = folder + '/' + title + ' ' + n + '.md';
     return this.app.vault.create(path, idea + '\n');
-  }
-
-  async applyProposal(p) {
-    const file = this.app.vault.getAbstractFileByPath(p.note);
-    if (!(file instanceof TFile) || file.extension !== 'md') throw new Error('Note is missing.');
-    if (!Number.isFinite(p.mtime) || Math.abs(file.stat.mtime - p.mtime) > 2000)
-      throw new Error('Note changed since this suggestion was made.');
-    const changes = {};
-    for (const key of ORGANIZE_FIELDS) {
-      if (!Object.prototype.hasOwnProperty.call(p.fields, key)) continue;
-      const value = p.fields[key];
-      if (typeof value !== 'string' || !value.trim() || value.length > 120 || /[\r\n]/.test(value))
-        throw new Error('Invalid ' + key + ' value.');
-      if (key === 'moc') {
-        const moc = this.app.vault.getAbstractFileByPath(value);
-        if (!(moc instanceof TFile) || moc.extension !== 'md')
-          throw new Error('Suggested MOC is missing.');
-        changes.moc = '[[' + moc.path.replace(/\.md$/i, '') + ']]';
-      } else changes[key] = value.trim();
-    }
-    if (!Object.keys(changes).length) throw new Error('Suggestion has no supported fields.');
-    const previous = {};
-    await this.app.fileManager.processFrontMatter(file, fm => {
-      for (const [key, value] of Object.entries(changes)) {
-        previous[key] = Object.prototype.hasOwnProperty.call(fm, key)
-          ? { exists: true, value: fm[key] } : { exists: false };
-        fm[key] = value;
-      }
-    });
-    this.lastOrganization = { path: file.path, previous };
-    try { await this.removeProposal(p.note); }
-    catch (e) { new Notice('Note updated. Suggestion cleanup needs attention.'); }
-    this.refresh(true);
-  }
-
-  async undoOrganization() {
-    const change = this.lastOrganization;
-    if (!change) return;
-    const file = this.app.vault.getAbstractFileByPath(change.path);
-    if (!(file instanceof TFile)) throw new Error('Note is missing.');
-    await this.app.fileManager.processFrontMatter(file, fm => {
-      for (const [key, prior] of Object.entries(change.previous)) {
-        if (prior.exists) fm[key] = prior.value;
-        else delete fm[key];
-      }
-    });
-    this.lastOrganization = null;
-    this.refresh(true);
   }
 
   // No onunload teardown: Obsidian detaches a plugin's own views on unload, and

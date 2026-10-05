@@ -1,43 +1,65 @@
 # Omega Centaur
 
-Omega Centaur helps you find and organize notes on a rotating globe. Notes sit on the sphere; links follow arcs across its surface. Search for a note, turn to its location, and keep a manual arrangement that survives reopening the view.
+Omega Centaur turns your vault into a rotating map. Each Markdown note sits on a sphere, and links follow arcs across its surface. Rotate the globe, move notes, search by title, and select a group to find its place.
 
-## Find a note
+Version 2 builds on that map. Search now gives you a direct route to a note, and a new Inbox helps you give notes a place in your existing maps of content.
 
-Open Omega Centaur from the ribbon or command palette. Its search field is ready when the globe opens. Search matches note titles, aliases, and group names. The result list shows where each note belongs. Use the arrow keys to choose a result, Enter to open it, or Escape to clear the search and return to the globe. Click a result to locate it, select **Open** to open its note, or select **Place** to attach it to a map of content (MOC). The **Search the globe** command focuses the field from anywhere in Obsidian.
+## The name reflects a cluster of ideas
 
-Click a group in the right-hand legend to turn toward it. Click that group again, click its highlighted note, or press Escape to return to the full spinning globe. Click another note to open it. Drag empty space to rotate through 360 degrees and scroll to zoom.
+Globular clusters are tightly bound collections of stars held together by their own gravity. That gravity gives them a nearly spherical shape. [Omega Centauri](https://www.esa.int/ESA_Multimedia/Images/2019/07/A_puzzle_of_10_million_stars), one of the largest examples visible from Earth, contains roughly 10 million stars. In this map, your notes form the cluster and their links show how the ideas connect.
 
-## Give notes a place
+## You can rotate, move notes, and search
 
-Select **Capture idea** on the globe, write a thought, and select **Save note**. Omega makes a Markdown note in `Omega Inbox` using its first line as the title. You can also save with Command/Control and Enter. The globe stays open and shows the new note in its **Inbox** tray.
+- Drag empty space to rotate the globe through 360 degrees. Scroll to zoom.
+- Drag a note to move it along the sphere. Linked notes respond when physics is enabled. Click a note to open it.
+- Focus the globe and use the arrow keys to rotate in small steps. Select a note, then press Shift and an arrow key to nudge it.
+- Search beneath the globe. Matching notes light up and the camera turns toward them. Press Escape to clear the search and return to the globe.
+- Hover over a group in the right-hand list to isolate it. Click a group, or focus it and press Enter or Space, to turn the globe toward that group. Its notes stay visible. Click the selected group again, click its highlighted note, or press Escape to clear the selection. The globe resumes spinning if Auto-rotate is enabled.
 
-The Inbox shows notes in `Omega Inbox` and, in MOC grouping, any other vault note still shown as **Unfiled**. Notes that need a location appear under **To place**; captured notes already attached to a MOC appear under **Placed**, with their location shown. Select **Attach** or **Change**, search for a MOC, and select that location. You can also drag a note card onto a MOC in the globe's right-hand legend. The tray closes after placement; use its Close button, Escape, or a click outside it to dismiss it at any time. A placed note outside `Omega Inbox` leaves the Inbox queue and remains findable through search.
+Grouping starts with your Map of Content hierarchy. Omega Centaur recognizes `type: moc`, `Index`, and note names ending in `MOC`. A child MOC can point to its parent with an `↑ [[Parent]]` breadcrumb. Settings also let you group by folder or a frontmatter key.
 
-Placement adds a `moc` link to the note and moves its globe group; it does not combine note contents or move the Markdown file. **Undo last attachment** reverses the most recent placement. Search results have **Place** for notes created outside Omega Inbox. This manual path works without AI or a skill.
+## Version 2 makes search a shorter path to your notes
 
-Drag a note to move it on the sphere. Select a note and press Shift plus an arrow key for a small adjustment. Omega saves manual positions across refreshes and restarts. Notes you have positioned stay fixed while the remaining notes can settle around them.
+The search field is ready when the globe opens. Search matches titles, aliases, and group names. Results show each note's location. Use the arrow keys to choose a result and Enter to open its note. Click a result to turn the globe toward it, choose **Open** to open the note, or choose **Place** to attach it to a map of content. **Search the globe** in the command palette focuses the field from anywhere in Obsidian.
 
-Grouping starts with your Map of Content (MOC) hierarchy. Omega recognizes `type: moc`, `Index`, and note names ending in `MOC`. A child MOC can point to its parent with an `↑ [[Parent]]` breadcrumb. A note can declare its MOC with a `moc` property containing a link; existing links to MOCs also work. If a vault has no MOCs, Omega starts with note types when available, then folders, then all notes. Settings also let you choose a frontmatter property for grouping.
+The right-hand list now works as a set of locations. Select a group to turn toward its node, then select it again or press Escape to return to the full spinning globe.
 
-New and changed notes usually appear automatically after Obsidian indexes them. If a new note or link is missing, run **Omega Centaur: Refresh globe** from the command palette.
+## Version 2 gives new notes a place
 
-## Optional AI organization suggestions
+Select **Capture idea**, write a thought, and select **Save note**. Omega creates a Markdown note in `Omega Inbox` using its first line as the title. Pressing Command/Control and Enter also saves it. The globe stays open and shows the new note in the Inbox tray.
 
-The companion [Omega Organize skill](skills/omega-organize/SKILL.md) remains optional. It reads the vault you specify and prepares proposals from its existing note types, areas, statuses, and MOCs. Ask Codex to organize notes in `Omega Inbox`, or name specific notes. The skill does not change notes. Run **Omega Centaur: Review organization suggestions** from the command palette to inspect and apply proposals.
+The Inbox shows captured notes and, when grouping by MOC, other vault notes still shown as **Unfiled**. Notes that need a location appear under **To place**; captured notes already attached to a MOC appear under **Placed**. Select **Attach** or **Change**, search for a MOC, and choose that location. You can also drag a note card onto a MOC in the right-hand list. The tray closes after placement, and you can close it with its Close button, Escape, or a click outside it.
 
-To try it from this checkout, tell Codex: “Use `skills/omega-organize/SKILL.md` to suggest places for notes in `Omega Inbox` of my test vault. Stage suggestions for review; leave the notes unchanged.” Give Codex the test vault's path. The skill is kept with the source so it can be published alongside the plugin later.
+Placement adds a `moc` link to the note and moves its globe group. It does not combine note contents or move the Markdown file. **Undo last attachment** reverses the most recent placement. A placed note outside `Omega Inbox` leaves the Inbox queue and remains findable through search.
 
-This first integration uses Codex as the AI counterpart. Omega does not call an AI service or require an API key. The skill stages proposals in the vault's `.obsidian/plugins/omega-centaur/organize-proposals.json`; the plugin reads that local file when you open the review panel. The file contains note paths, proposed properties, reasons, and modification times, not note bodies. Proposals made before a note changes must be regenerated.
+A note can declare its MOC with a `moc` property containing a link; existing links to MOCs also work. If a vault has no MOCs, Omega starts with note types when available, then folders, then all notes.
 
-## Install and test
+## New notes appear without reopening the view
 
-Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/omega-centaur/`, then enable Omega Centaur under Community plugins. The skill folder is for Codex and is not copied into the Obsidian plugin folder. This version is an experimental development branch; it is not a Community directory release.
+The map updates when you add, rename, or delete a Markdown note. Obsidian may need a moment to index a new note and its links. Existing node positions stay in place during the refresh. If a note or link is missing, run **Omega Centaur: Refresh globe** from the command palette.
 
-The globe renders locally and sends no vault data to a server. Omega currently targets desktop. Physics compares every pair of notes, so very large vaults may slow down; use **Exclude folders** in settings if needed. Mobile behavior has not been verified.
+## Local installation takes three files
 
-## Name and license
+Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/omega-centaur/`. Enable Omega Centaur under Community plugins, then open it from the ribbon or command palette. The same three files are the GitHub release assets.
 
-Globular clusters are massive, tightly bound collections of stars held together by their mutual gravity, which gives them a nearly spherical shape. [Omega Centauri](https://www.esa.int/ESA_Multimedia/Images/2019/07/A_puzzle_of_10_million_stars) is one of the largest examples visible from Earth and contains roughly 10 million stars. Your notes form a cluster of ideas on this map.
+## Position persistence, scale, and mobile support
 
-The source is GPL-3.0-only. Created by [B. Munoz](https://github.com/m-spectral). [Support development](https://buymeacoffee.com/morphystrategyco).
+- Manual node positions now survive a map refresh, closing the view, and restarting the plugin. Notes you have moved stay fixed while the remaining notes can settle around them.
+- Physics compares every pair of notes, so very large vaults can be slow. Exclude folders in settings if needed.
+- Desktop is the supported target. Mobile interaction has not been verified.
+
+## Your vault data stays local
+
+Omega Centaur lists the paths of all Markdown notes to build the full globe and search index. It uses file names for titles and Obsidian's metadata cache for aliases, properties, and links. It reads MOC note text to find the `↑ [[Parent]]` breadcrumb. It does not read the bodies of other notes to build the globe or send vault data to a server.
+
+**Exclude folders** removes matching notes from the map and search results. Omega still sees their paths while applying the filter; this setting is for display and performance, not access control. Capturing an idea creates a note in `Omega Inbox`. Placing a note changes that note's `moc` property after you choose a MOC.
+
+## Release files can be verified
+
+The GitHub release tag must match the version in `manifest.json`. GitHub Actions checks the code, attests the exact `main.js`, `styles.css`, and `manifest.json` bytes, and uploads those files as release assets. After publication, download an asset and verify it with `gh attestation verify main.js -R m-spectral/omega-centaur` (repeat for `styles.css`). Attestations are generated when the release workflow runs.
+
+## The source is GPL-3.0-only
+
+Read the [license](LICENSE) before reusing or distributing the source.
+
+Created by [B. Munoz](https://github.com/m-spectral). [Support development](https://buymeacoffee.com/morphystrategyco).

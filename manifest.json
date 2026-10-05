@@ -1,7 +1,7 @@
 {
   "id": "omega-centaur",
   "name": "Omega Centaur",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "minAppVersion": "1.13.7",
   "description": "Capture and find notes on a rotating globe, then place them in your existing maps of content.",
   "author": "b. munoz",
