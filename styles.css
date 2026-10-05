@@ -33,7 +33,14 @@
   background: var(--background-secondary); box-shadow: 0 12px 30px rgba(0,0,0,.3);
 }
 .omega-centaur-root .mg-inbox-panel.mg-open { display: block; }
+.omega-centaur-root .mg-inbox-header { display: flex; align-items: center; justify-content: space-between; }
 .omega-centaur-root .mg-inbox-title { font-size: 14px; font-weight: 600; color: var(--text-normal); }
+.omega-centaur-root .mg-inbox-close { border: 0; box-shadow: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; font-size: 20px; line-height: 1; padding: 2px 5px; }
+.omega-centaur-root .mg-inbox-close:focus-visible { outline: 2px solid var(--interactive-accent); }
+.omega-centaur-root .mg-inbox-count { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+.omega-centaur-root .mg-inbox-section { color: var(--text-muted); font-size: 11px; font-weight: 600;
+  margin-top: 12px; text-transform: uppercase; letter-spacing: .04em; }
 .omega-centaur-root .mg-inbox-help,
 .omega-centaur-root .mg-inbox-empty { color: var(--text-muted); font-size: 12px; line-height: 1.4; margin: 6px 0 10px; }
 .omega-centaur-root .mg-inbox-card { border: 1px solid var(--background-modifier-border);
@@ -41,6 +48,8 @@
 .omega-centaur-root .mg-inbox-card:active { cursor: grabbing; }
 .omega-centaur-root .mg-inbox-name { color: var(--text-normal); font-size: 12.5px; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.omega-centaur-root .mg-inbox-location { color: var(--text-muted); font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; }
 .omega-centaur-root .mg-inbox-actions { display: flex; gap: 6px; margin-top: 7px; }
 .omega-centaur-root .mg-inbox-actions button,
 .omega-centaur-root .mg-inbox-undo { cursor: pointer; font-size: 11.5px; }

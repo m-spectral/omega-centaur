@@ -279,7 +279,7 @@ class GlobeView extends ItemView {
     this.inboxButton = root.createEl('button', {
       cls: 'mg-inbox-toggle', type: 'button', text: 'Inbox'
     });
-    this.inboxButton.setAttribute('aria-label', 'Show unplaced captured notes');
+    this.inboxButton.setAttribute('aria-label', 'Show captured notes');
     this.inboxButton.setAttribute('aria-expanded', 'false');
     this.inboxButton.onclick = () => {
       this.inboxOpen = !this.inboxOpen;
@@ -288,6 +288,13 @@ class GlobeView extends ItemView {
     this.inboxPanel = root.createDiv({ cls: 'mg-inbox-panel' });
     this.inboxOpen = false;
     this.draggingInboxPath = null;
+    this.registerDomEvent(root, 'pointerdown', e => {
+      if (this.inboxOpen && !this.inboxPanel.contains(e.target) &&
+          !this.inboxButton.contains(e.target)) this.closeInbox();
+    });
+    this.registerDomEvent(root, 'keydown', e => {
+      if (e.key === 'Escape' && this.inboxOpen) this.closeInbox();
+    });
 
     this.legendEl = root.createDiv({ cls: 'mg-legend' });
     this.canvas   = root.createEl('canvas', { cls: 'mg-canvas' });
@@ -379,17 +386,26 @@ class GlobeView extends ItemView {
 
   renderInbox() {
     if (!this.inboxPanel) return;
-    const notes = this.plugin.unplacedInboxNotes();
-    this.inboxButton.setText('Inbox ' + notes.length);
+    const entries = this.plugin.inboxNotes();
+    const pending = entries.filter(entry => !entry.moc);
+    const placed = entries.filter(entry => entry.moc);
+    this.inboxButton.setText(pending.length ? 'Inbox ' + pending.length : 'Inbox');
+    this.inboxButton.setAttribute('aria-label', 'Show captured notes, ' + pending.length + ' to place');
     this.inboxButton.setAttribute('aria-expanded', String(this.inboxOpen));
     this.inboxPanel.toggleClass('mg-open', this.inboxOpen);
     this.inboxPanel.empty();
     if (!this.inboxOpen) return;
-    this.inboxPanel.createDiv({ cls: 'mg-inbox-title', text: 'Place your ideas' });
+    const header = this.inboxPanel.createDiv({ cls: 'mg-inbox-header' });
+    header.createDiv({ cls: 'mg-inbox-title', text: 'Your ideas' });
+    const close = header.createEl('button', { cls: 'mg-inbox-close', type: 'button', text: '×' });
+    close.setAttribute('aria-label', 'Close Inbox');
+    close.onclick = () => this.closeInbox();
+    this.inboxPanel.createDiv({ cls: 'mg-inbox-count',
+      text: pending.length + ' to place · ' + placed.length + ' placed' });
     this.inboxPanel.createDiv({ cls: 'mg-inbox-help',
       text: this.model?.grouping === 'moc'
-        ? 'Drag a note onto a MOC on the right, or choose Attach.'
-        : 'Choose Attach to pick a MOC. Switch grouping to MOCs to drag onto the legend.' });
+        ? 'Drag onto a MOC on the right, or choose a location.'
+        : 'Choose a location. Switch grouping to MOCs to drag onto the legend.' });
     if (this.plugin.lastPlacement) {
       const undo = this.inboxPanel.createEl('button', {
         cls: 'mg-inbox-undo', type: 'button', text: 'Undo last attachment'
@@ -399,18 +415,22 @@ class GlobeView extends ItemView {
         catch (e) { new Notice('Could not undo: ' + e.message); }
       };
     }
-    if (!notes.length) {
-      this.inboxPanel.createDiv({ cls: 'mg-inbox-empty', text: 'Inbox clear. Capture an idea to start.' });
-      return;
-    }
-    for (const file of notes) {
+    if (!entries.length)
+      this.inboxPanel.createDiv({ cls: 'mg-inbox-empty', text: 'Capture an idea to start.' });
+    if (pending.length)
+      this.inboxPanel.createDiv({ cls: 'mg-inbox-section', text: 'To place' });
+    for (const entry of [...pending, ...placed]) {
+      if (entry === placed[0])
+        this.inboxPanel.createDiv({ cls: 'mg-inbox-section', text: 'Placed' });
+      const { file, moc } = entry;
       const card = this.inboxPanel.createDiv({ cls: 'mg-inbox-card' });
       card.draggable = true;
-      card.setAttribute('aria-label', 'Unplaced note: ' + file.basename);
+      card.setAttribute('aria-label', (moc ? 'Placed note: ' : 'Unplaced note: ') + file.basename);
       card.createDiv({ cls: 'mg-inbox-name', text: file.basename });
+      if (moc) card.createDiv({ cls: 'mg-inbox-location', text: moc.basename });
       const actions = card.createDiv({ cls: 'mg-inbox-actions' });
-      const attach = actions.createEl('button', { type: 'button', text: 'Attach' });
-      attach.setAttribute('aria-label', 'Attach ' + file.basename + ' to a MOC');
+      const attach = actions.createEl('button', { type: 'button', text: moc ? 'Change' : 'Attach' });
+      attach.setAttribute('aria-label', (moc ? 'Change MOC for ' : 'Attach ') + file.basename + (moc ? '' : ' to a MOC'));
       attach.onclick = () => this.plugin.openPlacement(file);
       const open = actions.createEl('button', { type: 'button', text: 'Open' });
       open.setAttribute('aria-label', 'Open ' + file.basename);
@@ -427,6 +447,12 @@ class GlobeView extends ItemView {
         for (const row of this.legendRows.values()) row.removeClass('mg-drop-hover');
       };
     }
+  }
+
+  closeInbox() {
+    if (!this.inboxOpen) return;
+    this.inboxOpen = false;
+    this.renderInbox();
   }
 
   /* ---------- search ---------- */
@@ -826,7 +852,7 @@ class GlobeView extends ItemView {
           row.removeClass('mg-drop-hover');
           this.contentEl.removeClass('mg-placing');
           void this.plugin.attachNoteToMoc(notePath, moc.path)
-            .then(() => { this.renderInbox(); this.focusGroup(o.name); new Notice('Note attached to ' + moc.basename + '.'); })
+            .then(() => { this.closeInbox(); this.focusGroup(o.name); new Notice('Note attached to ' + moc.basename + '.'); })
             .catch(error => new Notice('Could not attach note: ' + error.message));
         };
       }
@@ -1166,7 +1192,7 @@ class PlacementModal extends Modal {
           try {
             const leaf = await this.plugin.activate();
             if (leaf.view instanceof GlobeView) {
-              leaf.view.inboxOpen = true;
+              leaf.view.inboxOpen = false;
               await leaf.view.build();
               leaf.view.focusGroup(file.basename);
             }
@@ -1379,25 +1405,26 @@ module.exports = class OmegaCentaur extends Plugin {
     return matches.length === 1 ? matches[0] : null;
   }
 
-  unplacedInboxNotes() {
+  inboxNotes() {
     return this.app.vault.getMarkdownFiles()
-      .filter(file => {
-        if (!file.path.startsWith('Omega Inbox/')) return false;
+      .filter(file => file.path.startsWith('Omega Inbox/'))
+      .map(file => {
         const placedAt = this.justPlaced.get(file.path);
-        if (!placedAt) return true;
-        if (Date.now() - placedAt < 3000) return false;
-        this.justPlaced.delete(file.path);
-        return true;
-      })
-      .filter(file => {
+        if (placedAt && Date.now() - placedAt.time < 3000)
+          return { file, moc: this.app.vault.getAbstractFileByPath(placedAt.mocPath) };
+        if (placedAt) this.justPlaced.delete(file.path);
         const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.moc;
         const value = Array.isArray(raw) ? raw[0] : raw;
-        if (!value) return true;
-        const link = String(value).replace(/^\[\[|\]\]$/g, '');
+        if (!value) return { file, moc: null };
+        const link = String(value).trim().replace(/^\[\[|\]\]$/g, '').split('|')[0].split('#')[0];
         const target = this.app.metadataCache.getFirstLinkpathDest(link, file.path);
-        return !isMocFile(this.app, target);
+        return { file, moc: isMocFile(this.app, target) ? target : null };
       })
-      .sort((a, b) => b.stat.mtime - a.stat.mtime || a.basename.localeCompare(b.basename));
+      .sort((a, b) => b.file.stat.mtime - a.file.stat.mtime || a.file.basename.localeCompare(b.file.basename));
+  }
+
+  unplacedInboxNotes() {
+    return this.inboxNotes().filter(entry => !entry.moc).map(entry => entry.file);
   }
 
   openPlacement(file) {
@@ -1418,7 +1445,7 @@ module.exports = class OmegaCentaur extends Plugin {
       fm.moc = placedValue;
     });
     this.lastPlacement = { path: note.path, previous, placedValue };
-    this.justPlaced.set(note.path, Date.now());
+    this.justPlaced.set(note.path, { mocPath: moc.path, time: Date.now() });
     this.refresh(true);
     return moc;
   }
