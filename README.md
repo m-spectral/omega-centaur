@@ -61,7 +61,7 @@ For the globe, Omega uses file names for titles and Obsidian's metadata cache fo
 
 ## Release files can be verified
 
-The GitHub release tag must match the version in `manifest.json`. GitHub Actions checks the code, attests the exact `main.js`, `styles.css`, and `manifest.json` bytes, and uploads those files as release assets. After publication, download an asset and verify it with `gh attestation verify main.js -R m-spectral/omega-centaur` (repeat for `styles.css`). Attestations are generated when the release workflow runs.
+The `2.0.0` release tag matches the version in `manifest.json`. Its GitHub Actions run attested the exact `main.js`, `styles.css`, and `manifest.json` files published as release assets. Download an asset and verify it with `gh attestation verify main.js -R m-spectral/omega-centaur` (repeat for `styles.css` and `manifest.json`).
 
 ## Sample Images from Version 1
 
