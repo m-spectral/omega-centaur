@@ -543,6 +543,7 @@ class GlobeView extends ItemView {
       row.toggleClass('mg-active', start + k === this.searchActive);
       const locate = row.createEl('button', { cls: 'mg-search-locate', type: 'button' });
       locate.setAttribute('aria-label', 'Show ' + nd.name + ' on globe');
+      locate.setAttribute('title', nd.name + ' · ' + nd.group);
       locate.createSpan({ cls: 'mg-search-name', text: nd.name });
       locate.createSpan({ cls: 'mg-search-group', text: nd.group });
       locate.onclick = () => { this.focusSearchHit(start + k); this.searchEl.focus(); };
