@@ -63,19 +63,31 @@ For the globe, Omega uses file names for titles and Obsidian's metadata cache fo
 
 The `2.0.0` release tag matches the version in `manifest.json`. Its GitHub Actions run attested the exact `main.js`, `styles.css`, and `manifest.json` files published as release assets. Download an asset and verify it with `gh attestation verify main.js -R m-spectral/omega-centaur` (repeat for `styles.css` and `manifest.json`).
 
-## Sample Images from Version 1
+## Sample Images from Version 2
 
-### Hover over a group in the right-hand list to isolate it
+### Omega Centaur V2.0.0 Overview
+<img width="1122" height="909" alt="Omega Centaur v2 0 0" src="https://github.com/user-attachments/assets/2d99ffe8-038a-4dbc-8e1f-a2c71d61cb6d" />
 
-<img width="1131" height="919" alt="Omega Centaur 1" src="https://github.com/user-attachments/assets/3416f6af-0f20-40ce-b8de-073379ad0277" />
+### Selecting Node
+<img width="1117" height="909" alt="Omega Centaur Selecting Node" src="https://github.com/user-attachments/assets/2939214c-e478-47ea-98fe-6440139202ae" />
 
-### Drag empty space to rotate the globe through 360 degrees. Scroll to zoom.
+### Selecting Node from Legend
+<img width="1126" height="921" alt="Omega Centaur - Selecting Node from Legend" src="https://github.com/user-attachments/assets/bcf36720-60fd-4703-9de5-7dd6432b412b" />
 
-<img width="1125" height="912" alt="Omega Centaur 2" src="https://github.com/user-attachments/assets/80dcaf52-bba7-4ef4-9f47-efc542c88848" />
+### Search Function
+<img width="1121" height="919" alt="Omega Centaur - Search" src="https://github.com/user-attachments/assets/cb3bf3ea-5c7a-48fd-b6fd-0b2960bb161d" />
 
-### Search note titles beneath the globe.
+### Capture Idea Panel 1
+<img width="1128" height="920" alt="Omega Centaur - Capture Idea Panel" src="https://github.com/user-attachments/assets/5edc2c93-34a9-49d1-bc6e-0cc9a93fb050" />
 
-<img width="1131" height="915" alt="Omega Centaur 3" src="https://github.com/user-attachments/assets/b2a3c969-639b-4bca-b661-3978846f3edb" />
+### Capture Idea Panel 2 - Committing Your Note
+<img width="1127" height="917" alt="Omega Centaur - Capture Idea Panel 2" src="https://github.com/user-attachments/assets/f89cead1-3d7b-400e-b8d6-eb93cdb324fa" />
+
+### Inbox for Unlisted Notes
+<img width="1131" height="929" alt="Omega Centaur - Inbox for Unfiled Notes" src="https://github.com/user-attachments/assets/3c4a2421-313b-440c-b6e8-21ed9737e401" />
+
+### Committing Unlisted Note to MOC
+<img width="1122" height="918" alt="Omega Centaur Setting Note Location from Inbox" src="https://github.com/user-attachments/assets/c7443938-1725-44a1-bc90-16f9711f7a3d" />
 
 ## License
 
